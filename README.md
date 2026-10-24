@@ -6,6 +6,8 @@ documents itself with comment-based help (`Get-Help .\<script>.ps1 -Full`).
 | Script | Purpose |
 |---|---|
 | [`exchange/Get-ExchangeQueues.ps1`](exchange/Get-ExchangeQueues.ps1) | Collects Exchange transport queue, database copy, performance counter and service health data and prints it as one JSON object. |
+| [`exchange/Send-ExchangeQueueMetrics.ps1`](exchange/Send-ExchangeQueueMetrics.ps1) | Runs the collector and sends the result to the local OneAgent as MINT metrics. Meant for a Scheduled Task. |
+| [`exchange/Install-ExchangeQueueMetrics.ps1`](exchange/Install-ExchangeQueueMetrics.ps1) | One-shot installer for an Exchange server: downloads the scripts, checks OneAgent/MINT, tests the credentials, registers the Scheduled Task. |
 
 ## exchange/Get-ExchangeQueues.ps1
 
@@ -50,3 +52,10 @@ or snap-in available. The account that runs it needs permission to run `Get-Queu
 
 **Origin.** Copied from the `exchange-queue-extension` repository (`scripts/Get-ExchangeQueues.ps1`,
 commit `46672e8`). The two copies are not linked; keep them in sync by hand.
+
+## Exchange metrics to Dynatrace
+
+`Send-ExchangeQueueMetrics.ps1` runs the collector above and sends the result to the local OneAgent as MINT
+metrics; `Install-ExchangeQueueMetrics.ps1` downloads both, checks the prerequisites, tests the account and
+schedules the task. Requirements, install steps, validation in the tenant and troubleshooting are in
+[exchange/README.md](exchange/README.md).
