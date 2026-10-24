@@ -1,156 +1,152 @@
 {
-  "name": "Exchange queue metrics - ingest validation",
-  "type": "notebook",
-  "content": {
-    "version": "7",
-    "defaultTimeframe": {
-      "from": "now()-2h",
-      "to": "now()"
+  "version": "7",
+  "defaultTimeframe": {
+    "from": "now()-2h",
+    "to": "now()"
+  },
+  "sections": [
+    {
+      "id": "1",
+      "type": "markdown",
+      "markdown": "# Exchange queue metrics: ingest validation\nRun the sections top to bottom after the install. Allow 2 to 3 minutes after the first task run.\n\n- **Section 2**: every `exchange.*` metric key the tenant has received. Compare with the metrics table in `exchange/README.md`.\n- **Sections 3 and 4**: data points per metric in the last 15 minutes (about 15 is healthy, `last_success` should be 1). A 0 in a `db_*` column is normal on a non-mailbox server.\n- **Sections 5 to 7**: collector health over time, queue depth and service states."
     },
-    "sections": [
-      {
-        "id": "1",
-        "type": "markdown",
-        "markdown": "# Exchange queue metrics: ingest validation\nRun the sections top to bottom after the install. Allow 2 to 3 minutes after the first task run.\n\n- **Section 2**: every `exchange.*` metric key the tenant has received. Compare with the metrics table in `exchange/README.md`.\n- **Sections 3 and 4**: data points per metric in the last 15 minutes (about 15 is healthy, `last_success` should be 1). A 0 in a `db_*` column is normal on a non-mailbox server.\n- **Sections 5 to 7**: collector health over time, queue depth and service states."
-      },
-      {
-        "id": "2",
-        "type": "dql",
-        "title": "Received exchange.* metric keys",
-        "showInput": true,
-        "state": {
-          "input": {
-            "value": "metrics from: now() - 1h\n| filter startsWith(metric.key, \"exchange.\")\n| summarize count(), by: {metric.key}\n| sort metric.key"
-          },
-          "visualization": "table",
-          "visualizationSettings": {
-            "autoSelectVisualization": true,
-            "chartSettings": {}
-          },
-          "querySettings": {
-            "maxResultRecords": 1000,
-            "defaultScanLimitGbytes": 500,
-            "maxResultMegaBytes": 1,
-            "defaultSamplingRatio": 10,
-            "enableSampling": false
-          }
-        }
-      },
-      {
-        "id": "3",
-        "type": "dql",
-        "title": "Data points: collector health and queues",
-        "showInput": true,
-        "state": {
-          "input": {
-            "value": "timeseries {\n  success      = max(exchange.collector.success),\n  duration     = max(exchange.collector.duration_ms),\n  queueCount   = max(exchange.queue.count),\n  totalMsgs    = max(exchange.queue.total_messages),\n  poison       = max(exchange.queue.named.poison_length),\n  submission   = max(exchange.queue.named.submission_length),\n  mailboxDeliv = max(exchange.queue.named.active_mailbox_delivery)\n}, by: {server}, from: now() - 15m, interval: 1m\n| fieldsAdd last_success = arrayLast(success),\n            success_pts = arraySize(arrayRemoveNulls(success)),\n            duration_pts = arraySize(arrayRemoveNulls(duration)),\n            queueCount_pts = arraySize(arrayRemoveNulls(queueCount)),\n            totalMsgs_pts = arraySize(arrayRemoveNulls(totalMsgs)),\n            poison_pts = arraySize(arrayRemoveNulls(poison)),\n            submission_pts = arraySize(arrayRemoveNulls(submission)),\n            mailboxDeliv_pts = arraySize(arrayRemoveNulls(mailboxDeliv))\n| fields server, last_success, success_pts, duration_pts, queueCount_pts, totalMsgs_pts,\n         poison_pts, submission_pts, mailboxDeliv_pts"
-          },
-          "visualization": "table",
-          "visualizationSettings": {
-            "autoSelectVisualization": true,
-            "chartSettings": {}
-          },
-          "querySettings": {
-            "maxResultRecords": 1000,
-            "defaultScanLimitGbytes": 500,
-            "maxResultMegaBytes": 1,
-            "defaultSamplingRatio": 10,
-            "enableSampling": false
-          }
-        }
-      },
-      {
-        "id": "4",
-        "type": "dql",
-        "title": "Data points: databases, submission counters, services",
-        "showInput": true,
-        "state": {
-          "input": {
-            "value": "timeseries {\n  copyQueue   = max(exchange.db.copy_queue_length),\n  replayQueue = max(exchange.db.replay_queue_length),\n  mounted     = max(exchange.db.mounted),\n  subOk       = max(exchange.submission.successful_submissions_per_sec),\n  subTempFail = max(exchange.submission.temporary_submission_failures_per_sec),\n  subFailed   = max(exchange.submission.failed_submissions_per_sec),\n  subPending  = max(exchange.submission.messages_queued_for_submission),\n  svcRunning  = max(exchange.service.running),\n  svcPresent  = max(exchange.service.present)\n}, by: {server}, from: now() - 15m, interval: 1m\n| fieldsAdd copyQueue_pts = arraySize(arrayRemoveNulls(copyQueue)),\n            replayQueue_pts = arraySize(arrayRemoveNulls(replayQueue)),\n            mounted_pts = arraySize(arrayRemoveNulls(mounted)),\n            subOk_pts = arraySize(arrayRemoveNulls(subOk)),\n            subTempFail_pts = arraySize(arrayRemoveNulls(subTempFail)),\n            subFailed_pts = arraySize(arrayRemoveNulls(subFailed)),\n            subPending_pts = arraySize(arrayRemoveNulls(subPending)),\n            svcRunning_pts = arraySize(arrayRemoveNulls(svcRunning)),\n            svcPresent_pts = arraySize(arrayRemoveNulls(svcPresent))\n| fields server, copyQueue_pts, replayQueue_pts, mounted_pts, subOk_pts, subTempFail_pts, subFailed_pts, subPending_pts, svcRunning_pts, svcPresent_pts"
-          },
-          "visualization": "table",
-          "visualizationSettings": {
-            "autoSelectVisualization": true,
-            "chartSettings": {}
-          },
-          "querySettings": {
-            "maxResultRecords": 1000,
-            "defaultScanLimitGbytes": 500,
-            "maxResultMegaBytes": 1,
-            "defaultSamplingRatio": 10,
-            "enableSampling": false
-          }
-        }
-      },
-      {
-        "id": "5",
-        "type": "dql",
-        "title": "Collector success per server",
-        "showInput": true,
-        "state": {
-          "input": {
-            "value": "timeseries success = max(exchange.collector.success), by: {server}, from: now() - 1h, interval: 1m"
-          },
-          "visualization": "lineChart",
-          "visualizationSettings": {
-            "autoSelectVisualization": false,
-            "chartSettings": {}
-          },
-          "querySettings": {
-            "maxResultRecords": 1000,
-            "defaultScanLimitGbytes": 500,
-            "maxResultMegaBytes": 1,
-            "defaultSamplingRatio": 10,
-            "enableSampling": false
-          }
-        }
-      },
-      {
-        "id": "6",
-        "type": "dql",
-        "title": "Messages per queue (only non-empty queues with -ExcludeEmpty)",
-        "showInput": true,
-        "state": {
-          "input": {
-            "value": "timeseries messages = max(exchange.queue.messages), by: {server, queue}, from: now() - 1h, interval: 1m"
-          },
-          "visualization": "lineChart",
-          "visualizationSettings": {
-            "autoSelectVisualization": false,
-            "chartSettings": {}
-          },
-          "querySettings": {
-            "maxResultRecords": 1000,
-            "defaultScanLimitGbytes": 500,
-            "maxResultMegaBytes": 1,
-            "defaultSamplingRatio": 10,
-            "enableSampling": false
-          }
-        }
-      },
-      {
-        "id": "7",
-        "type": "dql",
-        "title": "Service states (1 = running)",
-        "showInput": true,
-        "state": {
-          "input": {
-            "value": "timeseries running = min(exchange.service.running, scalar: true), by: {server, service}, from: now() - 15m\n| sort running asc, service asc"
-          },
-          "visualization": "table",
-          "visualizationSettings": {
-            "autoSelectVisualization": true,
-            "chartSettings": {}
-          },
-          "querySettings": {
-            "maxResultRecords": 1000,
-            "defaultScanLimitGbytes": 500,
-            "maxResultMegaBytes": 1,
-            "defaultSamplingRatio": 10,
-            "enableSampling": false
-          }
+    {
+      "id": "2",
+      "type": "dql",
+      "title": "Received exchange.* metric keys",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "metrics from: now() - 1h\n| filter startsWith(metric.key, \"exchange.\")\n| summarize count(), by: {metric.key}\n| sort metric.key"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
         }
       }
-    ]
-  }
+    },
+    {
+      "id": "3",
+      "type": "dql",
+      "title": "Data points: collector health and queues",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries {\n  success      = max(exchange.collector.success),\n  duration     = max(exchange.collector.duration_ms),\n  queueCount   = max(exchange.queue.count),\n  totalMsgs    = max(exchange.queue.total_messages),\n  poison       = max(exchange.queue.named.poison_length),\n  submission   = max(exchange.queue.named.submission_length),\n  mailboxDeliv = max(exchange.queue.named.active_mailbox_delivery)\n}, by: {server}, from: now() - 15m, interval: 1m\n| fieldsAdd last_success = arrayLast(success),\n            success_pts = arraySize(arrayRemoveNulls(success)),\n            duration_pts = arraySize(arrayRemoveNulls(duration)),\n            queueCount_pts = arraySize(arrayRemoveNulls(queueCount)),\n            totalMsgs_pts = arraySize(arrayRemoveNulls(totalMsgs)),\n            poison_pts = arraySize(arrayRemoveNulls(poison)),\n            submission_pts = arraySize(arrayRemoveNulls(submission)),\n            mailboxDeliv_pts = arraySize(arrayRemoveNulls(mailboxDeliv))\n| fields server, last_success, success_pts, duration_pts, queueCount_pts, totalMsgs_pts,\n         poison_pts, submission_pts, mailboxDeliv_pts"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "4",
+      "type": "dql",
+      "title": "Data points: databases, submission counters, services",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries {\n  copyQueue   = max(exchange.db.copy_queue_length),\n  replayQueue = max(exchange.db.replay_queue_length),\n  mounted     = max(exchange.db.mounted),\n  subOk       = max(exchange.submission.successful_submissions_per_sec),\n  subTempFail = max(exchange.submission.temporary_submission_failures_per_sec),\n  subFailed   = max(exchange.submission.failed_submissions_per_sec),\n  subPending  = max(exchange.submission.messages_queued_for_submission),\n  svcRunning  = max(exchange.service.running),\n  svcPresent  = max(exchange.service.present)\n}, by: {server}, from: now() - 15m, interval: 1m\n| fieldsAdd copyQueue_pts = arraySize(arrayRemoveNulls(copyQueue)),\n            replayQueue_pts = arraySize(arrayRemoveNulls(replayQueue)),\n            mounted_pts = arraySize(arrayRemoveNulls(mounted)),\n            subOk_pts = arraySize(arrayRemoveNulls(subOk)),\n            subTempFail_pts = arraySize(arrayRemoveNulls(subTempFail)),\n            subFailed_pts = arraySize(arrayRemoveNulls(subFailed)),\n            subPending_pts = arraySize(arrayRemoveNulls(subPending)),\n            svcRunning_pts = arraySize(arrayRemoveNulls(svcRunning)),\n            svcPresent_pts = arraySize(arrayRemoveNulls(svcPresent))\n| fields server, copyQueue_pts, replayQueue_pts, mounted_pts, subOk_pts, subTempFail_pts, subFailed_pts, subPending_pts, svcRunning_pts, svcPresent_pts"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "5",
+      "type": "dql",
+      "title": "Collector success per server",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries success = max(exchange.collector.success), by: {server}, from: now() - 1h, interval: 1m"
+        },
+        "visualization": "lineChart",
+        "visualizationSettings": {
+          "autoSelectVisualization": false,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "6",
+      "type": "dql",
+      "title": "Messages per queue (only non-empty queues with -ExcludeEmpty)",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries messages = max(exchange.queue.messages), by: {server, queue}, from: now() - 1h, interval: 1m"
+        },
+        "visualization": "lineChart",
+        "visualizationSettings": {
+          "autoSelectVisualization": false,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "7",
+      "type": "dql",
+      "title": "Service states (1 = running)",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries running = min(exchange.service.running, scalar: true), by: {server, service}, from: now() - 15m\n| sort running asc, service asc"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    }
+  ]
 }
