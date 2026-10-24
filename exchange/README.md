@@ -94,6 +94,8 @@ timeseries running = min(exchange.service.running), by:{server, service}
 Metrics are also tagged with the OneAgent host, so you can filter on `dt.entity.host`. To list everything sent,
 search the Metrics app for `exchange.`.
 
+**Notebook:** import [notebooks/exchange-metric-ingest-validation.json](notebooks/exchange-metric-ingest-validation.json) (Notebooks app > Upload) to run all of the checks above in one place.
+
 **Failure test** (optional): stop a monitored service or run the task as an account without Exchange rights.
 `exchange.collector.success` should drop to `0` within a minute or two. This is the metric to alert on.
 
