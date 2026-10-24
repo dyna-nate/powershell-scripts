@@ -269,41 +269,34 @@ function Get-CounterValue {
     }
 }
 
+function Get-FirstCounterValue {
+    param([string[]]$Paths)
+    # First path that exists and returns a value wins; counter names differ between Exchange versions.
+    foreach ($path in $Paths) {
+        $v = Get-CounterValue $path
+        if ($null -ne $v) { return $v }
+    }
+    return $null
+}
+
 function Get-PerfCounterSnapshot {
-    $paths = @(
-        '\MSExchange Mail Submission(*)\Successful Submissions/sec',
-        '\MSExchange Mail Submission(*)\Temporary Submission Failures/sec',
-        '\MSExchange Mail Submission(*)\Hub Servers In Retry',
-        '\MSExchangeIS Store(*)\Messages Queued For Submission',
-        '\MSExchangeIS Mailbox(*)\Messages Queued For Submission'
-    )
-
-    $result = [ordered]@{
-        successfulSubmissionsPerSec     = $null
-        temporarySubmissionFailuresPerSec = $null
-        hubServersInRetry               = $null
-        messagesQueuedForSubmission     = $null
+    # Exchange 2016/2019 counters first, then the older names as fallback.
+    [PSCustomObject][ordered]@{
+        successfulSubmissionsPerSec       = Get-FirstCounterValue @(
+            '\MSExchange Submission\Successful Submissions Per Second',
+            '\MSExchange Mail Submission(*)\Successful Submissions/sec')
+        temporarySubmissionFailuresPerSec = Get-FirstCounterValue @(
+            '\MSExchange Submission\Temporary Submission Failures/sec',
+            '\MSExchange Mail Submission(*)\Temporary Submission Failures/sec')
+        failedSubmissionsPerSec           = Get-FirstCounterValue @(
+            '\MSExchange Submission\Failed Submissions Per Second')
+        hubServersInRetry                 = Get-FirstCounterValue @(
+            '\MSExchange Mail Submission(*)\Hub Servers In Retry')
+        messagesQueuedForSubmission       = Get-FirstCounterValue @(
+            '\MSExchange Submission\Pending Submissions',
+            '\MSExchangeIS Store(*)\Messages Queued For Submission',
+            '\MSExchangeIS Mailbox(*)\Messages Queued For Submission')
     }
-
-    $v = Get-CounterValue '\MSExchange Mail Submission(*)\Successful Submissions/sec'
-    if ($null -ne $v) { $result.successfulSubmissionsPerSec = $v }
-
-    $v = Get-CounterValue '\MSExchange Mail Submission(*)\Temporary Submission Failures/sec'
-    if ($null -ne $v) { $result.temporarySubmissionFailuresPerSec = $v }
-
-    $v = Get-CounterValue '\MSExchange Mail Submission(*)\Hub Servers In Retry'
-    if ($null -ne $v) { $result.hubServersInRetry = $v }
-
-    $v = Get-CounterValue '\MSExchangeIS Store(*)\Messages Queued For Submission'
-    if ($null -eq $v) {
-        $v = Get-CounterValue '\MSExchangeIS Mailbox(*)\Messages Queued For Submission'
-    }
-    if ($null -ne $v) { $result.messagesQueuedForSubmission = $v }
-
-    # Silence unused
-    $null = $paths
-
-    return [PSCustomObject]$result
 }
 
 function Get-ServiceSnapshot {
@@ -573,6 +566,7 @@ $functionDef = @(
             "Build-NamedQueueAggregates",
             "Get-DatabaseCopySnapshot",
             "Get-CounterValue",
+            "Get-FirstCounterValue",
             "Get-PerfCounterSnapshot",
             "Get-ServiceSnapshot",
             "Get-ExchangeHealthSnapshot"
