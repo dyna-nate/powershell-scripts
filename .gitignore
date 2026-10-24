@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Output and logs produced when running the scripts
+*.log
+*.zip
+exq_diag_*/
+
+# Never commit credentials or keys
+*.pem
+*.key
+*.pfx
+*.cer
+*.secret
+.env
