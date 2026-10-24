@@ -206,13 +206,18 @@ if ($code -ne 0) {
     Fail ("Task registered but its first run returned 0x{0:X}. See $logFile." -f $code)
 }
 $runLog = if (Test-Path -LiteralPath $logFile) { Get-Content -LiteralPath $logFile -Raw } else { "" }
-if ($runLog -notmatch 'Sent (\d+) lines .*HTTP 202 .*"linesOk"\s*:\s*(\d+).*"linesInvalid"\s*:\s*(\d+)') {
+# The OneAgent reply is pretty-printed JSON with the fields in any order, so match each field on its own.
+$mSent = [regex]::Match($runLog, 'Sent (\d+) lines')
+$mOk   = [regex]::Match($runLog, '"linesOk"\s*:\s*(\d+)')
+$mBad  = [regex]::Match($runLog, '"linesInvalid"\s*:\s*(\d+)')
+if (-not ($mSent.Success -and $mOk.Success -and $mBad.Success -and $runLog -match 'HTTP 202')) {
     Fail "First run finished but $logFile has no accepted-by-OneAgent line:`n$runLog"
 }
-if ($Matches[2] -ne $Matches[1] -or $Matches[3] -ne "0") {
-    Fail "OneAgent accepted $($Matches[2]) of $($Matches[1]) lines ($($Matches[3]) invalid). See $logFile."
+$sent = [int]$mSent.Groups[1].Value; $linesOk = [int]$mOk.Groups[1].Value; $linesBad = [int]$mBad.Groups[1].Value
+if ($linesOk -ne $sent -or $linesBad -ne 0) {
+    Fail "OneAgent accepted $linesOk of $sent lines ($linesBad invalid). See $logFile."
 }
-Ok "first run succeeded, OneAgent accepted all $($Matches[2]) lines"
+Ok "first run succeeded, OneAgent accepted all $linesOk lines"
 $plain = $null
 
 Write-Host "`nDone. Metrics are under 'exchange.*' (e.g. exchange.queue.messages, exchange.collector.success)." -ForegroundColor Green
