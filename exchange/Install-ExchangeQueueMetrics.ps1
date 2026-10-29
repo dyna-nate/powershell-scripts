@@ -177,14 +177,21 @@ function Remove-MetricsTask {
 }
 
 function Wait-TaskRun {
-    param([string]$Name, [int]$TimeoutSec = 300)
+    param([string]$Name, [int]$TimeoutSec = 300, [switch]$WaitForSchedule)
     $started = Get-Date
     try { [void]$taskRoot.GetTask($Name).Run($null) }
     catch {
         $comError = $_.Exception.Message
+        # Native stderr would become a terminating error under $ErrorActionPreference = Stop.
+        $prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
         $out = & schtasks.exe /run /tn $Name 2>&1 | Out-String
-        if ($LASTEXITCODE -ne 0) {
-            Fail "Could not start task '$Name'. COM: $comError. schtasks: $($out.Trim())"
+        $exit = $LASTEXITCODE
+        $ErrorActionPreference = $prev
+        if ($exit -ne 0) {
+            if (-not $WaitForSchedule) {
+                Fail "Could not start task '$Name'. COM: $comError. schtasks: $($out.Trim())"
+            }
+            Write-Host "   WARN cannot start '$Name' manually (COM: $comError; schtasks: $($out.Trim())); waiting for its first scheduled run instead" -ForegroundColor Yellow
         }
     }
     # Wait for the run to begin (Queued/Running, or a last-run time after our start), then to end.
@@ -243,7 +250,7 @@ $cmd = "& { & '$sendScript'$extra } *> '$logFile'"
 Register-MetricsTask -Name $TaskName -Arguments "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"$cmd`"" -RepeatMinutes $IntervalMinutes
 Ok "registered"
 
-$code = Wait-TaskRun -Name $TaskName
+$code = Wait-TaskRun -Name $TaskName -WaitForSchedule
 if ($code -ne 0) {
     Fail ("Task registered but its first run returned 0x{0:X}. See $logFile." -f $code)
 }
