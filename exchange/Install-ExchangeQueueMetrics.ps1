@@ -161,7 +161,10 @@ function Register-MetricsTask {
     if ($RepeatMinutes -gt 0) {
         $trigger = $def.Triggers.Create(1)           # TASK_TRIGGER_TIME
         $trigger.StartBoundary = (Get-Date).AddMinutes(1).ToString("yyyy-MM-ddTHH:mm:ss")
-        $trigger.Repetition.Interval = "PT${RepeatMinutes}M"   # no Duration = repeat indefinitely
+        $trigger.Repetition.Interval = "PT${RepeatMinutes}M"
+        # An explicit duration is required: with the interval alone the scheduler logs event 113
+        # (0x80070057, "not all specified triggers will start the task") and the task never fires.
+        $trigger.Repetition.Duration = "P3650D"
         $trigger.Enabled = $true
     }
     try {
