@@ -136,41 +136,66 @@ $plain = $Credential.GetNetworkCredential().Password
 $extra = if ($ExcludeEmpty) { " -ExcludeEmpty" } else { "" }
 $logFile = Join-Path $InstallPath "last-run.log"
 
+# Tasks are handled through the Task Scheduler COM API (Schedule.Service), not the *-ScheduledTask
+# cmdlets: those go through a CIM provider that can fail on its own ("The request was aborted",
+# "Element not found") while the scheduler itself is healthy.
+$scheduler = New-Object -ComObject "Schedule.Service"
+$scheduler.Connect()
+$taskRoot = $scheduler.GetFolder("\")
+
 function Register-MetricsTask {
-    param([string]$Name, [string]$Arguments, $Trigger)
-    $action = New-ScheduledTaskAction -Execute $ps -Argument $Arguments -WorkingDirectory $InstallPath
-    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 10) `
-        -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-    $reg = @{ TaskName = $Name; Action = $action; Settings = $settings; User = $Credential.UserName
-               Password = $plain; RunLevel = "Highest"; Force = $true }
-    if ($Trigger) { $reg.Trigger = $Trigger }
-    try { [void](Register-ScheduledTask @reg) }
+    param([string]$Name, [string]$Arguments, [int]$RepeatMinutes = 0)
+    $def = $scheduler.NewTask(0)
+    $def.RegistrationInfo.Description = "Sends Exchange queue metrics to the local Dynatrace OneAgent (MINT)."
+    $def.Principal.RunLevel = 1                      # TASK_RUNLEVEL_HIGHEST
+    $def.Settings.Enabled = $true
+    $def.Settings.ExecutionTimeLimit = "PT10M"
+    $def.Settings.MultipleInstances = 2              # TASK_INSTANCES_IGNORE_NEW
+    $def.Settings.StartWhenAvailable = $true
+    $def.Settings.DisallowStartIfOnBatteries = $false
+    $def.Settings.StopIfGoingOnBatteries = $false
+    $action = $def.Actions.Create(0)                 # TASK_ACTION_EXEC
+    $action.Path = $ps
+    $action.Arguments = $Arguments
+    $action.WorkingDirectory = $InstallPath
+    if ($RepeatMinutes -gt 0) {
+        $trigger = $def.Triggers.Create(1)           # TASK_TRIGGER_TIME
+        $trigger.StartBoundary = (Get-Date).AddMinutes(1).ToString("yyyy-MM-ddTHH:mm:ss")
+        $trigger.Repetition.Interval = "PT${RepeatMinutes}M"   # no Duration = repeat indefinitely
+        $trigger.Enabled = $true
+    }
+    try {
+        # 6 = TASK_CREATE_OR_UPDATE, 1 = TASK_LOGON_PASSWORD
+        [void]$taskRoot.RegisterTaskDefinition($Name, $def, 6, $Credential.UserName, $plain, 1, $null)
+    }
     catch { Fail "Could not register task '$Name' as $($Credential.UserName): $($_.Exception.Message)" }
-    # Registration can return before the Task Scheduler lists the task; wait until it is visible.
-    for ($i = 0; $i -lt 15 -and -not (Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue); $i++) {
-        Start-Sleep -Seconds 1
-    }
-    if (-not (Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue)) {
-        $known = (Get-ScheduledTask -TaskName "Dynatrace-*" -ErrorAction SilentlyContinue | ForEach-Object { $_.TaskPath + $_.TaskName }) -join ", "
-        Fail "Task '$Name' was registered without error but the Task Scheduler cannot find it. Dynatrace-* tasks present: $known"
-    }
+}
+
+function Remove-MetricsTask {
+    param([string]$Name)
+    try { $taskRoot.DeleteTask($Name, 0) } catch { }
 }
 
 function Wait-TaskRun {
     param([string]$Name, [int]$TimeoutSec = 300)
-    $task = Get-ScheduledTask -TaskName $Name -ErrorAction Stop
-    try { Start-ScheduledTask -InputObject $task }
-    catch {
-        Start-Sleep -Seconds 3    # one retry, the scheduler can be briefly busy right after a registration
-        Start-ScheduledTask -InputObject (Get-ScheduledTask -TaskName $Name -ErrorAction Stop)
-    }
+    $started = Get-Date
+    try { [void]$taskRoot.GetTask($Name).Run($null) }
+    catch { Fail "Could not start task '$Name': $($_.Exception.Message)" }
+    # Wait for the run to begin (Queued/Running, or a last-run time after our start), then to end.
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
-    Start-Sleep -Seconds 2
-    while ((Get-ScheduledTask -TaskName $Name).State -eq "Running") {
-        if ((Get-Date) -gt $deadline) { Stop-ScheduledTask -TaskName $Name; Fail "Task '$Name' did not finish within $TimeoutSec s." }
+    $begun = $false
+    while ($true) {
+        $t = $taskRoot.GetTask($Name)
+        $busy = $t.State -in 2, 4                    # Queued, Running
+        if ($busy -or $t.LastRunTime -ge $started.AddSeconds(-2)) { $begun = $true }
+        if ($begun -and -not $busy) { break }
+        if ((Get-Date) -gt $deadline) {
+            try { $t.Stop(0) } catch { }
+            Fail "Task '$Name' $(if ($begun) { 'did not finish' } else { 'did not start' }) within $TimeoutSec s."
+        }
         Start-Sleep -Seconds 2
     }
-    return (Get-ScheduledTaskInfo -TaskName $Name).LastTaskResult
+    return $taskRoot.GetTask($Name).LastTaskResult
 }
 
 $testTask = "$TaskName-InstallTest"
@@ -204,14 +229,12 @@ try {
     }
 }
 finally {
-    Unregister-ScheduledTask -TaskName $testTask -Confirm:$false -ErrorAction SilentlyContinue
+    Remove-MetricsTask -Name $testTask
 }
 
 Step "Registering scheduled task '$TaskName' every $IntervalMinutes min"
-$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
-    -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes) -RepetitionDuration (New-TimeSpan -Days 3650)
 $cmd = "& { & '$sendScript'$extra } *> '$logFile'"
-Register-MetricsTask -Name $TaskName -Arguments "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"$cmd`"" -Trigger $trigger
+Register-MetricsTask -Name $TaskName -Arguments "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"$cmd`"" -RepeatMinutes $IntervalMinutes
 Ok "registered"
 
 $code = Wait-TaskRun -Name $TaskName
