@@ -64,10 +64,10 @@ C:\ProgramData\Dynatrace\ExchangeQueueMetrics\Send-ExchangeQueueMetrics.ps1 -Exc
 
 **On the server**
 ```powershell
-Get-ScheduledTaskInfo Dynatrace-ExchangeQueueMetrics | Select LastRunTime, LastTaskResult, NextRunTime
+schtasks /query /tn "Dynatrace-ExchangeQueueMetrics" /v /fo list | Select-String "Status|Last Run Time|Last Result|Next Run Time"
 Get-Content C:\ProgramData\Dynatrace\ExchangeQueueMetrics\last-run.log
 ```
-`LastTaskResult` should be `0`, and the log should end with `Sent N lines ... HTTP 202 {"linesOk":N,"linesInvalid":0...}`.
+`Last Result` should be `0`, and the log should end with `Sent N lines ... HTTP 202 {"linesOk":N,"linesInvalid":0...}`.
 
 **In Dynatrace** (allow 2 to 3 minutes after the first run; use a Notebook or the Metrics app)
 
@@ -131,6 +131,6 @@ Each distinct queue, database and service is its own series and counts toward cu
 ## Uninstall
 
 ```powershell
-Unregister-ScheduledTask Dynatrace-ExchangeQueueMetrics -Confirm:$false
+schtasks /delete /tn "Dynatrace-ExchangeQueueMetrics" /f
 Remove-Item C:\ProgramData\Dynatrace\ExchangeQueueMetrics -Recurse
 ```
