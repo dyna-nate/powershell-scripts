@@ -177,7 +177,7 @@ function Remove-MetricsTask {
 }
 
 function Wait-TaskRun {
-    param([string]$Name, [int]$TimeoutSec = 300, [switch]$WaitForSchedule)
+    param([string]$Name, [int]$TimeoutSec = 300)
     $started = Get-Date
     try { [void]$taskRoot.GetTask($Name).Run($null) }
     catch {
@@ -188,10 +188,7 @@ function Wait-TaskRun {
         $exit = $LASTEXITCODE
         $ErrorActionPreference = $prev
         if ($exit -ne 0) {
-            if (-not $WaitForSchedule) {
-                Fail "Could not start task '$Name'. COM: $comError. schtasks: $($out.Trim())"
-            }
-            Write-Host "   WARN cannot start '$Name' manually (COM: $comError; schtasks: $($out.Trim())); waiting for its first scheduled run instead" -ForegroundColor Yellow
+            Fail "Could not start task '$Name'. COM: $comError. schtasks: $($out.Trim())"
         }
     }
     # Wait for the run to begin (Queued/Running, or a last-run time after our start), then to end.
@@ -247,14 +244,28 @@ finally {
 
 Step "Registering scheduled task '$TaskName' every $IntervalMinutes min"
 $cmd = "& { & '$sendScript'$extra } *> '$logFile'"
+Remove-Item -LiteralPath $logFile -Force -ErrorAction SilentlyContinue
+$registeredAt = Get-Date
 Register-MetricsTask -Name $TaskName -Arguments "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"$cmd`"" -RepeatMinutes $IntervalMinutes
 Ok "registered"
 
-$code = Wait-TaskRun -Name $TaskName -WaitForSchedule
-if ($code -ne 0) {
-    Fail ("Task registered but its first run returned 0x{0:X}. See $logFile." -f $code)
+# The task fires about a minute after registration. Confirm that from the log it writes: on some
+# servers the Task Scheduler does not report Status / Last Run Time reliably, and a manual start
+# of a task with a repeating trigger can be rejected.
+Write-Host "   waiting for the first scheduled run (about a minute)..."
+$deadline = (Get-Date).AddSeconds(240)
+while ($true) {
+    if ((Test-Path -LiteralPath $logFile) -and (Get-Item -LiteralPath $logFile).LastWriteTime -ge $registeredAt.AddSeconds(-2)) {
+        $txt = Get-Content -LiteralPath $logFile -Raw
+        if ($txt -match '"linesInvalid"\s*:\s*\d+' -or $txt -match 'Collection failed') { break }   # reply fully written
+    }
+    if ((Get-Date) -gt $deadline) {
+        Fail "The task did not run within 4 minutes. Check it with: schtasks /query /tn `"$TaskName`" /v /fo list, and $logFile."
+    }
+    Start-Sleep -Seconds 3
 }
 $runLog = if (Test-Path -LiteralPath $logFile) { Get-Content -LiteralPath $logFile -Raw } else { "" }
+if ($runLog -match 'Collection failed') { Fail "First scheduled run failed to collect:`n$runLog" }
 # The OneAgent reply is pretty-printed JSON with the fields in any order, so match each field on its own.
 $mSent = [regex]::Match($runLog, 'Sent (\d+) lines')
 $mOk   = [regex]::Match($runLog, '"linesOk"\s*:\s*(\d+)')
