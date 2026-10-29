@@ -180,7 +180,13 @@ function Wait-TaskRun {
     param([string]$Name, [int]$TimeoutSec = 300)
     $started = Get-Date
     try { [void]$taskRoot.GetTask($Name).Run($null) }
-    catch { Fail "Could not start task '$Name': $($_.Exception.Message)" }
+    catch {
+        $comError = $_.Exception.Message
+        $out = & schtasks.exe /run /tn $Name 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) {
+            Fail "Could not start task '$Name'. COM: $comError. schtasks: $($out.Trim())"
+        }
+    }
     # Wait for the run to begin (Queued/Running, or a last-run time after our start), then to end.
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
     $begun = $false
