@@ -146,11 +146,24 @@ function Register-MetricsTask {
     if ($Trigger) { $reg.Trigger = $Trigger }
     try { [void](Register-ScheduledTask @reg) }
     catch { Fail "Could not register task '$Name' as $($Credential.UserName): $($_.Exception.Message)" }
+    # Registration can return before the Task Scheduler lists the task; wait until it is visible.
+    for ($i = 0; $i -lt 15 -and -not (Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue); $i++) {
+        Start-Sleep -Seconds 1
+    }
+    if (-not (Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue)) {
+        $known = (Get-ScheduledTask -TaskName "Dynatrace-*" -ErrorAction SilentlyContinue | ForEach-Object { $_.TaskPath + $_.TaskName }) -join ", "
+        Fail "Task '$Name' was registered without error but the Task Scheduler cannot find it. Dynatrace-* tasks present: $known"
+    }
 }
 
 function Wait-TaskRun {
     param([string]$Name, [int]$TimeoutSec = 300)
-    Start-ScheduledTask -TaskName $Name
+    $task = Get-ScheduledTask -TaskName $Name -ErrorAction Stop
+    try { Start-ScheduledTask -InputObject $task }
+    catch {
+        Start-Sleep -Seconds 3    # one retry, the scheduler can be briefly busy right after a registration
+        Start-ScheduledTask -InputObject (Get-ScheduledTask -TaskName $Name -ErrorAction Stop)
+    }
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
     Start-Sleep -Seconds 2
     while ((Get-ScheduledTask -TaskName $Name).State -eq "Running") {
