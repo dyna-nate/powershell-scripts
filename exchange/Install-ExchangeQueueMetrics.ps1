@@ -144,7 +144,7 @@ $scheduler.Connect()
 $taskRoot = $scheduler.GetFolder("\")
 
 function Register-MetricsTask {
-    param([string]$Name, [string]$Arguments, [int]$RepeatMinutes = 0, [switch]$OnceSoon)
+    param([string]$Name, [string]$Arguments, [int]$RepeatMinutes = 0)
     $def = $scheduler.NewTask(0)
     $def.RegistrationInfo.Description = "Sends Exchange queue metrics to the local Dynatrace OneAgent (MINT)."
     $def.Principal.RunLevel = 1                      # TASK_RUNLEVEL_HIGHEST
@@ -158,12 +158,9 @@ function Register-MetricsTask {
     $action.Path = $ps
     $action.Arguments = $Arguments
     $action.WorkingDirectory = $InstallPath
-    if ($RepeatMinutes -gt 0 -or $OnceSoon) {
+    if ($RepeatMinutes -gt 0) {
         $trigger = $def.Triggers.Create(1)           # TASK_TRIGGER_TIME
         $trigger.StartBoundary = (Get-Date).AddMinutes(1).ToString("yyyy-MM-ddTHH:mm:ss")
-        $trigger.Enabled = $true
-    }
-    if ($RepeatMinutes -gt 0) {
         $trigger.Repetition.Interval = "PT${RepeatMinutes}M"
         # An explicit duration is required: with the interval alone the scheduler logs event 113
         # (0x80070057, "not all specified triggers will start the task") and the task never fires.
@@ -184,7 +181,9 @@ function Remove-MetricsTask {
 
 function Wait-TaskRun {
     # The task is started by its own trigger, not by Run(): on-demand Run (COM and schtasks /run)
-    # fails with 0x80070490 on some servers while triggers fire normally.
+    # fails with 0x80070490 on some servers while triggers fire normally. One-time triggers did not fire
+    # on such a server either, so the test task uses the same repeating trigger as the real task; it is
+    # deleted as soon as its first run ends.
     param([string]$Name, [int]$TimeoutSec = 300)
     $started = Get-Date
     # Wait for the run to begin (Queued/Running, or a last-run time after our start), then to end.
@@ -210,7 +209,7 @@ Step "Testing the collector as $($Credential.UserName)"
 try {
     Remove-Item -LiteralPath $testLog -Force -ErrorAction SilentlyContinue
     $cmd = "& { & '$sendScript'$extra -DryRun } *> '$testLog'"
-    Register-MetricsTask -Name $testTask -Arguments "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"$cmd`"" -OnceSoon
+    Register-MetricsTask -Name $testTask -Arguments "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"$cmd`"" -RepeatMinutes 1
     Write-Host "   test task starts on its own trigger in about a minute..."
     $code = Wait-TaskRun -Name $testTask
     $out = if (Test-Path -LiteralPath $testLog) { Get-Content -LiteralPath $testLog -Raw } else { "" }
