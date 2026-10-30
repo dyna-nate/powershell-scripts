@@ -11,6 +11,7 @@
     Metrics (all gauges; keys and dimensions mirror ExtensionYAML/extension.yaml):
       custom.exchange.queue.message_count / .deferred_count / .locked_count / .incoming_rate / .outgoing_rate / .velocity
       custom.exchange.queue.total_messages / .count                  (per server)
+      custom.exchange.hybrid.outbound.message_count / .retry_messages (per server, mail_path=hybrid_outbound)
       custom.exchange.queue.poison.length, .submission.length, .submission.deferred, .active.mailbox.length,
         .external.active.length, .external.total.length, .internal.active.length, .internal.total.length,
         .retry.mailbox.length                                        (per server)
@@ -23,6 +24,9 @@
 
 .PARAMETER Endpoint
     OneAgent metric ingest URL.
+.PARAMETER HybridHopDomains
+    CSV of Exchange Online hop suffixes. Queues whose NextHopDomain or Identity matches get
+    mail_path=hybrid_outbound. Default "mail.protection.outlook.com,mail.eo.outlook.com,protection.outlook.com".
 .PARAMETER Environment
     Value of the exchange.environment dimension, added to every metric. Default "onprem".
 .PARAMETER Prefix
@@ -39,6 +43,7 @@
 [CmdletBinding()]
 param(
     [string]$Endpoint = "http://127.0.0.1:14499/metrics/ingest",
+    [string]$HybridHopDomains = "mail.protection.outlook.com,mail.eo.outlook.com,protection.outlook.com",
     [string]$Environment = "onprem",
     [string]$Prefix = "custom.exchange",
     [switch]$DryRun,
@@ -81,6 +86,35 @@ function ConvertTo-DimValue {
     '"' + ($s -replace '\\', '\\' -replace '"', '\"' -replace '[\r\n]+', ' ') + '"'
 }
 
+# mail_path, mirroring the extension's classify_mail_path (first match wins):
+#   hybrid_outbound  NextHopDomain or Identity matches a hybrid hop suffix
+#   internal         internal-looking category or delivery type (mailbox delivery, submission, poison, ...)
+#   external_other   external, DNS or smart host delivery, and anything left over
+$hybridMatchers = @($HybridHopDomains -split ',' | ForEach-Object { $_.Trim().ToLower().TrimStart('.') } | Where-Object { $_ })
+
+function Test-HybridHop {
+    param([string]$Value)
+    $v = ([string]$Value).Trim().ToLower().TrimEnd('.')
+    if (-not $v) { return $false }
+    foreach ($m in $hybridMatchers) {
+        # Loose like the extension: exact, dotted suffix, or plain endswith.
+        if ($v -eq $m -or $v.EndsWith(".$m") -or $v.EndsWith($m)) { return $true }
+    }
+    return $false
+}
+
+function Get-MailPath {
+    param($Queue)
+    if ((Test-HybridHop $Queue.NextHopDomain) -or (Test-HybridHop $Queue.Identity)) { return "hybrid_outbound" }
+    $leaf = if ([string]$Queue.Identity -match '\\([^\\]+)$') { $Matches[1] } else { [string]$Queue.Identity }
+    $cat = [string]$Queue.NextHopCategory
+    $dtype = [string]$Queue.DeliveryType
+    if ($cat -eq "Internal" -or $leaf -in @("Submission", "Poison", "Unreachable") -or $dtype -match 'Mailbox|MapiDelivery') {
+        return "internal"
+    }
+    return "external_other"
+}
+
 function Add-Metric {
     param([string]$Key, $Value, [hashtable]$Dims = @{})
     if ($null -eq $Value) { return }
@@ -107,7 +141,13 @@ try {
     if ($data.server) { $server = [string]$data.server }
     $srv = @{ "exchange.server" = $server }
 
+    $hybridMessages = 0; $hybridRetry = 0
     foreach ($q in @($data.queues)) {
+        $mailPath = Get-MailPath $q
+        if ($mailPath -eq "hybrid_outbound") {
+            $hybridMessages += [int]$q.MessageCount
+            if ([string]$q.Status -match '^(Retry|Suspended)$') { $hybridRetry += [int]$q.MessageCount }
+        }
         $d = @{
             "exchange.server"   = $server
             "queue.identity"    = $q.Identity
@@ -115,6 +155,7 @@ try {
             status              = $q.Status
             next_hop_domain     = $q.NextHopDomain
             next_hop_category   = $q.NextHopCategory
+            mail_path           = $mailPath
         }
         Add-Metric "queue.message_count"  $q.MessageCount $d
         Add-Metric "queue.deferred_count" $q.DeferredMessageCount $d
@@ -123,6 +164,9 @@ try {
         Add-Metric "queue.outgoing_rate" $q.OutgoingRate $d
         Add-Metric "queue.velocity"      $q.Velocity $d
     }
+    $hy = @{ "exchange.server" = $server; mail_path = "hybrid_outbound" }
+    Add-Metric "hybrid.outbound.message_count" $hybridMessages $hy
+    Add-Metric "hybrid.outbound.retry_messages" $hybridRetry $hy
     Add-Metric "queue.count"          $data.meta.queueCount $srv
     Add-Metric "queue.total_messages" $data.meta.totalMessageCount $srv
 

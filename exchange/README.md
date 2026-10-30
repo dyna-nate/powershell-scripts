@@ -105,8 +105,9 @@ All are gauges with the dimensions `exchange.server` and `exchange.environment` 
 
 | Metric | Extra dimensions |
 |---|---|
-| `custom.exchange.queue.message_count`, `.deferred_count`, `.locked_count`, `.incoming_rate`, `.outgoing_rate`, `.velocity` | `queue.identity`, `delivery_type`, `status`, `next_hop_domain`, `next_hop_category` |
+| `custom.exchange.queue.message_count`, `.deferred_count`, `.locked_count`, `.incoming_rate`, `.outgoing_rate`, `.velocity` | `queue.identity`, `delivery_type`, `status`, `next_hop_domain`, `next_hop_category`, `mail_path` |
 | `custom.exchange.queue.count`, `.total_messages` | |
+| `custom.exchange.hybrid.outbound.message_count`, `.retry_messages` | `mail_path` (always `hybrid_outbound`) |
 | `custom.exchange.queue.poison.length`, `.submission.length`, `.submission.deferred`, `.active.mailbox.length`, `.external.active.length`, `.external.total.length`, `.internal.active.length`, `.internal.total.length`, `.retry.mailbox.length` | |
 | `custom.exchange.queue.digest.message_count` (only with `-IncludeDigest` on the wrapper) | `delivery_type`, `status` |
 | `custom.exchange.database.copy_queue_length`, `.replay_queue_length`, `.mounted` | `database.copy`, `database.name`, `database.status` |
@@ -114,6 +115,8 @@ All are gauges with the dimensions `exchange.server` and `exchange.environment` 
 | `custom.exchange.service.running`, `.present` | `service`, `label` |
 | `custom.exchange.cluster.network.up` | `network` |
 | `custom.exchange.collector.success`, `.duration_ms` | |
+
+`mail_path` is `hybrid_outbound`, `internal` or `external_other`, as in the extension. A queue is `hybrid_outbound` when its next hop or identity ends with one of the hybrid hop domains (default `mail.protection.outlook.com`, `mail.eo.outlook.com`, `protection.outlook.com`). For a custom Online MX or a third-party relay, pass `-HybridHopDomains "a.example.com,b.example.com"` to the installer.
 
 Each distinct queue, database and service is its own series and counts toward custom metric consumption.
 

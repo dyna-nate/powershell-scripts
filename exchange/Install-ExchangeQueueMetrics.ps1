@@ -27,6 +27,8 @@
     How often the task runs.
 .PARAMETER ExcludeEmpty
     Pass -ExcludeEmpty to the collector (recommended, fewer queue series).
+.PARAMETER HybridHopDomains
+    CSV of Exchange Online hop suffixes for the mail_path dimension. Empty uses the wrapper default.
 .PARAMETER SkipDownload
     Use the scripts already in InstallPath.
 #>
@@ -41,6 +43,7 @@ param(
     [int]$IntervalMinutes = 1,
     [string]$Endpoint = "http://127.0.0.1:14499/metrics/ingest",
     [switch]$ExcludeEmpty,
+    [string]$HybridHopDomains = "",
     [switch]$SkipDownload
 )
 
@@ -134,6 +137,10 @@ Ok "test metric accepted (HTTP $($resp.StatusCode))"
 # --- 3 / 4. Scheduled tasks --------------------------------------------------------------------
 $plain = $Credential.GetNetworkCredential().Password
 $extra = if ($ExcludeEmpty) { " -ExcludeEmpty" } else { "" }
+if ($HybridHopDomains) {
+    if ($HybridHopDomains -notmatch '^[A-Za-z0-9.,\- ]+$') { Fail "HybridHopDomains may only contain letters, digits, dots, dashes and commas." }
+    $extra += " -HybridHopDomains '$HybridHopDomains'"
+}
 $logFile = Join-Path $InstallPath "last-run.log"
 
 # Tasks are handled through the Task Scheduler COM API (Schedule.Service), not the *-ScheduledTask
