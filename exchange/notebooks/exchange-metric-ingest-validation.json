@@ -8,7 +8,7 @@
     {
       "id": "1",
       "type": "markdown",
-      "markdown": "# Exchange queue metrics: ingest validation\nRun the sections top to bottom after the install. Allow 2 to 3 minutes after the first task run.\n\n- **Section 2**: every `custom.exchange.*` metric key the tenant has received. Compare with the metrics table in `exchange/README.md`.\n- **Sections 3 and 4**: data points per metric in the last 15 minutes (about 15 is healthy, `last_success` should be 1). A 0 in a `db_*` column is normal on a non-mailbox server.\n- **Sections 5 to 7**: collector health over time, queue depth and service states.\n- **Sections 8 and 9**: submission performance counters over time, and Exchange services that are installed but not running (all 34 monitored services)."
+      "markdown": "# Exchange queue metrics: ingest validation\nRun the sections top to bottom after the install. Allow 2 to 3 minutes after the first task run.\n\n- **Section 2**: every `custom.exchange.*` metric key the tenant has received. Compare with the metrics table in `exchange/README.md`.\n- **Sections 3 and 4**: data points per metric in the last 15 minutes (about 15 is healthy, `last_success` should be 1). A 0 in a `db_*` column is normal on a non-mailbox server.\n- **Sections 5 to 7**: collector health over time, queue depth and service states.\n- **Sections 8 and 9**: submission performance counters over time, and Exchange services that are installed but not running (all 34 monitored services).\n- **Sections 10 to 14**: dimension checks. Every dimension from the extension (`exchange.server`, `exchange.environment`, `queue.identity`, `next_hop_domain`, `mail_path`, `database.copy`, `database.name`, `database.status`, ...) should be filled in. A `null` or `0` in these tables means the dimension is missing."
     },
     {
       "id": "2",
@@ -179,6 +179,126 @@
       "state": {
         "input": {
           "value": "timeseries {\n  running = min(custom.exchange.service.running, scalar: true),\n  present = max(custom.exchange.service.present, scalar: true)\n}, by: {exchange.server, service, label}, from: now() - 15m\n| filter present == 1 and running == 0\n| sort server asc, service asc"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "10",
+      "type": "markdown",
+      "markdown": "## Dimension checks\nEach query groups by the dimensions the extension defines. Compare the output with `exchange/README.md`. Queue and database tables are empty on servers that have no queues or databases."
+    },
+    {
+      "id": "11",
+      "type": "dql",
+      "title": "Queue dimensions: series with each dimension filled in",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries messages = max(custom.exchange.queue.message_count, scalar: true),\n  by: {exchange.server, exchange.environment, queue.identity, delivery_type, status, next_hop_domain, next_hop_category, mail_path},\n  from: now() - 15m\n| summarize series = count(),\n    exchange_server = countIf(isNotNull(exchange.server)),\n    exchange_environment = countIf(isNotNull(exchange.environment)),\n    queue_identity = countIf(isNotNull(queue.identity)),\n    delivery_type = countIf(isNotNull(delivery_type)),\n    status = countIf(isNotNull(status)),\n    next_hop_domain = countIf(isNotNull(next_hop_domain)),\n    next_hop_category = countIf(isNotNull(next_hop_category)),\n    mail_path = countIf(isNotNull(mail_path))"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "12",
+      "type": "dql",
+      "title": "Queues by mail_path (hybrid_outbound, internal, external_other)",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries messages = sum(custom.exchange.queue.message_count, scalar: true),\n  by: {exchange.server, mail_path, queue.identity, next_hop_domain, delivery_type, status},\n  from: now() - 15m\n| sort mail_path asc, messages desc"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "13",
+      "type": "dql",
+      "title": "Hybrid outbound rollups (mail_path = hybrid_outbound)",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries {\n  hybridMessages = max(custom.exchange.hybrid.outbound.message_count, scalar: true),\n  hybridRetry = max(custom.exchange.hybrid.outbound.retry_messages, scalar: true)\n}, by: {exchange.server, exchange.environment, mail_path}, from: now() - 15m"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "14",
+      "type": "dql",
+      "title": "Database dimensions",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries {\n  copyQueue = max(custom.exchange.database.copy_queue_length, scalar: true),\n  mounted = max(custom.exchange.database.mounted, scalar: true)\n}, by: {exchange.server, exchange.environment, database.copy, database.name, database.status}, from: now() - 15m\n| sort database.name asc"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "15",
+      "type": "dql",
+      "title": "exchange.environment on every metric family (expect one row: onprem, all counts above 0)",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries {\n  collector = max(custom.exchange.collector.success),\n  queueCount = max(custom.exchange.queue.count),\n  queueMsgs = max(custom.exchange.queue.message_count),\n  poison = max(custom.exchange.queue.poison.length),\n  hybrid = max(custom.exchange.hybrid.outbound.message_count),\n  dbMounted = max(custom.exchange.database.mounted),\n  subOk = max(custom.exchange.submission.successful.persec),\n  isQueued = max(custom.exchange.is.messages_queued_for_submission),\n  svc = max(custom.exchange.service.running),\n  net = max(custom.exchange.cluster.network.up)\n}, by: {exchange.environment}, from: now() - 15m, interval: 1m\n| fieldsAdd collector_pts = arraySize(arrayRemoveNulls(collector)),\n            queueCount_pts = arraySize(arrayRemoveNulls(queueCount)),\n            queueMsgs_pts = arraySize(arrayRemoveNulls(queueMsgs)),\n            poison_pts = arraySize(arrayRemoveNulls(poison)),\n            hybrid_pts = arraySize(arrayRemoveNulls(hybrid)),\n            dbMounted_pts = arraySize(arrayRemoveNulls(dbMounted)),\n            subOk_pts = arraySize(arrayRemoveNulls(subOk)),\n            isQueued_pts = arraySize(arrayRemoveNulls(isQueued)),\n            svc_pts = arraySize(arrayRemoveNulls(svc)),\n            net_pts = arraySize(arrayRemoveNulls(net))\n| fields exchange.environment, collector_pts, queueCount_pts, queueMsgs_pts, poison_pts, hybrid_pts, dbMounted_pts, subOk_pts, isQueued_pts, svc_pts, net_pts"
         },
         "visualization": "table",
         "visualizationSettings": {
