@@ -120,7 +120,7 @@ try {
 finally { $tcp.Close() }
 Ok "port $($uriObj.Port) is listening"
 
-$probe = 'exchange.installer.check,server="{0}" gauge,1' -f $env:COMPUTERNAME
+$probe = 'custom.exchange.installer.check,server="{0}" gauge,1' -f $env:COMPUTERNAME
 try {
     $resp = Invoke-WebRequest -Uri $Endpoint -Method Post -Body ([Text.Encoding]::UTF8.GetBytes($probe)) `
         -ContentType "text/plain; charset=utf-8" -UseBasicParsing -TimeoutSec 15
@@ -224,17 +224,17 @@ try {
         $tail = ($out -split "`r?`n" | Select-Object -Last 15) -join "`n"
         Fail ("Collector test failed as $($Credential.UserName) (task result 0x{0:X}). Check the password, 'Log on as a batch job', and Exchange role membership.`n{1}" -f $code, $tail)
     }
-    $metricLines = @($out -split "`r?`n" | Where-Object { $_ -match '^exchange\.' })
+    $metricLines = @($out -split "`r?`n" | Where-Object { $_ -match '^custom\.exchange\.' })
     Ok "collector ran and produced $($metricLines.Count) metric lines"
     # Queues are the core signal, so they are required. The other sections can legitimately be
     # empty (no databases on an Edge/transport-only server), so a gap is a warning.
     foreach ($m in "queue.count", "queue.total_messages") {
-        if (-not ($metricLines | Where-Object { $_ -like "exchange.$m,*" })) { Fail "Collector output has no exchange.$m." }
+        if (-not ($metricLines | Where-Object { $_ -like "custom.exchange.$m,*" })) { Fail "Collector output has no custom.exchange.$m." }
     }
     Ok "queue metrics present"
     foreach ($m in @(@("queue.named.", "named queue aggregates"), @("db.", "database copies"),
                      @("submission.", "performance counters"), @("service.running", "service states"))) {
-        if ($metricLines | Where-Object { $_ -like "exchange.$($m[0])*" }) { Ok $m[1] }
+        if ($metricLines | Where-Object { $_ -like "custom.exchange.$($m[0])*" }) { Ok $m[1] }
         else { Write-Host "   WARN no $($m[1]) in the output" -ForegroundColor Yellow }
     }
     foreach ($w in ($out -split "`r?`n" | Where-Object { $_ -like "collector warning:*" })) {
@@ -283,4 +283,4 @@ if ($linesOk -ne $sent -or $linesBad -ne 0) {
 Ok "first run succeeded, OneAgent accepted all $linesOk lines"
 $plain = $null
 
-Write-Host "`nDone. Metrics are under 'exchange.*' (e.g. exchange.queue.messages, exchange.collector.success)." -ForegroundColor Green
+Write-Host "`nDone. Metrics are under 'custom.exchange.*' (e.g. custom.exchange.queue.messages, custom.exchange.collector.success)." -ForegroundColor Green

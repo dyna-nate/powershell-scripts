@@ -9,19 +9,19 @@
     (http://127.0.0.1:14499/metrics/ingest by default). The OneAgent adds the host dimensions.
 
     Metrics (all gauges):
-      exchange.queue.messages / .deferred / .locked / .incoming_rate / .outgoing_rate / .velocity
-      exchange.queue.total_messages / .count                  (per server)
-      exchange.queue.named.<aggregate>                        (poison, submission, ... per server)
-      exchange.db.copy_queue_length / .replay_queue_length / .mounted
-      exchange.submission.<counter>                           (perf counters, per server)
-      exchange.service.running / .present
-      exchange.cluster.network_up
-      exchange.collector.success / .duration_ms
+      custom.exchange.queue.messages / .deferred / .locked / .incoming_rate / .outgoing_rate / .velocity
+      custom.exchange.queue.total_messages / .count                  (per server)
+      custom.exchange.queue.named.<aggregate>                        (poison, submission, ... per server)
+      custom.exchange.db.copy_queue_length / .replay_queue_length / .mounted
+      custom.exchange.submission.<counter>                           (perf counters, per server)
+      custom.exchange.service.running / .present
+      custom.exchange.cluster.network_up
+      custom.exchange.collector.success / .duration_ms
 
 .PARAMETER Endpoint
     OneAgent metric ingest URL.
 .PARAMETER Prefix
-    Metric key prefix. Default "exchange".
+    Metric key prefix. Default "custom.exchange".
 .PARAMETER DryRun
     Print the MINT lines to stdout and do not send them.
 .PARAMETER ExcludeEmpty
@@ -34,7 +34,7 @@
 [CmdletBinding()]
 param(
     [string]$Endpoint = "http://127.0.0.1:14499/metrics/ingest",
-    [string]$Prefix = "exchange",
+    [string]$Prefix = "custom.exchange",
     [switch]$DryRun,
     [switch]$ExcludeEmpty,
     [int]$MinMessageCount = 0,

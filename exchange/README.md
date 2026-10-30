@@ -1,7 +1,7 @@
 # Exchange queue metrics for Dynatrace
 
 Collects Exchange transport queue, database copy, performance counter and service health data on an Exchange
-server every minute and sends it to the local Dynatrace OneAgent as `exchange.*` metrics (metric ingestion
+server every minute and sends it to the local Dynatrace OneAgent as `custom.exchange.*` metrics (metric ingestion
 protocol, "MINT").
 
 | File | Purpose |
@@ -73,31 +73,31 @@ Get-Content C:\ProgramData\Dynatrace\ExchangeQueueMetrics\last-run.log
 
 Collector health, expect `1` for each server:
 ```
-timeseries success = max(exchange.collector.success), by:{server}, interval:1m
+timeseries success = max(custom.exchange.collector.success), by:{server}, interval:1m
 ```
 Queue depth per queue:
 ```
-timeseries messages = max(exchange.queue.messages), by:{server, queue, delivery_type}
+timeseries messages = max(custom.exchange.queue.messages), by:{server, queue, delivery_type}
 ```
 Named queue aggregates (poison, submission, mailbox delivery, remote delivery):
 ```
-timeseries v = max(exchange.queue.named.poison_length), by:{server}
+timeseries v = max(custom.exchange.queue.named.poison_length), by:{server}
 ```
 Database copies (mailbox servers only):
 ```
-timeseries copyQueue = max(exchange.db.copy_queue_length), by:{server, database}
+timeseries copyQueue = max(custom.exchange.db.copy_queue_length), by:{server, database}
 ```
 Service states, `1` is running:
 ```
-timeseries running = min(exchange.service.running), by:{server, service}
+timeseries running = min(custom.exchange.service.running), by:{server, service}
 ```
 Metrics are also tagged with the OneAgent host, so you can filter on `dt.entity.host`. To list everything sent,
-search the Metrics app for `exchange.`.
+search the Metrics app for `custom.exchange.`.
 
 **Notebook:** import [notebooks/exchange-metric-ingest-validation.json](notebooks/exchange-metric-ingest-validation.json) (Notebooks app > Upload) to run all of the checks above in one place.
 
 **Failure test** (optional): stop a monitored service or run the task as an account without Exchange rights.
-`exchange.collector.success` should drop to `0` within a minute or two. This is the metric to alert on.
+`custom.exchange.collector.success` should drop to `0` within a minute or two. This is the metric to alert on.
 
 ## Metrics
 
@@ -105,15 +105,15 @@ All are gauges with a `server` dimension.
 
 | Metric | Extra dimensions |
 |---|---|
-| `exchange.queue.messages`, `.deferred`, `.locked`, `.incoming_rate`, `.outgoing_rate`, `.velocity` | `queue`, `delivery_type`, `status`, `next_hop`, `next_hop_category` |
-| `exchange.queue.count`, `.total_messages` | |
-| `exchange.queue.named.*` | |
-| `exchange.queue.digest.messages` (only with `-IncludeDigest` on the wrapper) | `delivery_type`, `status` |
-| `exchange.db.copy_queue_length`, `.replay_queue_length`, `.mounted` | `database`, `copy_status` |
-| `exchange.submission.*` | |
-| `exchange.service.running`, `.present` | `service`, `label` |
-| `exchange.cluster.network_up` | `network` |
-| `exchange.collector.success`, `.duration_ms` | |
+| `custom.exchange.queue.messages`, `.deferred`, `.locked`, `.incoming_rate`, `.outgoing_rate`, `.velocity` | `queue`, `delivery_type`, `status`, `next_hop`, `next_hop_category` |
+| `custom.exchange.queue.count`, `.total_messages` | |
+| `custom.exchange.queue.named.*` | |
+| `custom.exchange.queue.digest.messages` (only with `-IncludeDigest` on the wrapper) | `delivery_type`, `status` |
+| `custom.exchange.db.copy_queue_length`, `.replay_queue_length`, `.mounted` | `database`, `copy_status` |
+| `custom.exchange.submission.*` | |
+| `custom.exchange.service.running`, `.present` | `service`, `label` |
+| `custom.exchange.cluster.network_up` | `network` |
+| `custom.exchange.collector.success`, `.duration_ms` | |
 
 Each distinct queue, database and service is its own series and counts toward custom metric consumption.
 
@@ -126,7 +126,7 @@ Each distinct queue, database and service is its own series and counts toward cu
 | Collector test fails as the service account | Password wrong, account lacks *Log on as a batch job*, or lacks Exchange permission. The installer prints the task result and log tail. |
 | Task result is not `0` later on | Read `last-run.log`. Expired password on the service account is the usual cause. |
 | `linesInvalid` above 0 | A metric line was rejected. Keep the `last-run.log` and report it. |
-| Gaps in the data | A run took longer than the interval; use a larger `-IntervalMinutes`. Check `exchange.collector.duration_ms`. |
+| Gaps in the data | A run took longer than the interval; use a larger `-IntervalMinutes`. Check `custom.exchange.collector.duration_ms`. |
 
 ## Uninstall
 
