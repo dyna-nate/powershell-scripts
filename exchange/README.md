@@ -73,23 +73,23 @@ Get-Content C:\ProgramData\Dynatrace\ExchangeQueueMetrics\last-run.log
 
 Collector health, expect `1` for each server:
 ```
-timeseries success = max(custom.exchange.collector.success), by:{server}, interval:1m
+timeseries success = max(custom.exchange.collector.success), by: {exchange.server}, interval:1m
 ```
 Queue depth per queue:
 ```
-timeseries messages = max(custom.exchange.queue.messages), by:{server, queue, delivery_type}
+timeseries messages = max(custom.exchange.queue.messages), by:{exchange.server, queue.identity, delivery_type}
 ```
 Named queue aggregates (poison, submission, mailbox delivery, remote delivery):
 ```
-timeseries v = max(custom.exchange.queue.named.poison_length), by:{server}
+timeseries v = max(custom.exchange.queue.named.poison_length), by: {exchange.server}
 ```
 Database copies (mailbox servers only):
 ```
-timeseries copyQueue = max(custom.exchange.db.copy_queue_length), by:{server, database}
+timeseries copyQueue = max(custom.exchange.db.copy_queue_length), by:{exchange.server, database.copy}
 ```
 Service states, `1` is running:
 ```
-timeseries running = min(custom.exchange.service.running), by:{server, service}
+timeseries running = min(custom.exchange.service.running), by: {exchange.server, service}
 ```
 Metrics are also tagged with the OneAgent host, so you can filter on `dt.entity.host`. To list everything sent,
 search the Metrics app for `custom.exchange.`.
@@ -101,15 +101,15 @@ search the Metrics app for `custom.exchange.`.
 
 ## Metrics
 
-All are gauges with a `server` dimension.
+All are gauges with an `exchange.server` dimension.
 
 | Metric | Extra dimensions |
 |---|---|
-| `custom.exchange.queue.messages`, `.deferred`, `.locked`, `.incoming_rate`, `.outgoing_rate`, `.velocity` | `queue`, `delivery_type`, `status`, `next_hop`, `next_hop_category` |
+| `custom.exchange.queue.messages`, `.deferred`, `.locked`, `.incoming_rate`, `.outgoing_rate`, `.velocity` | `queue.identity`, `delivery_type`, `status`, `next_hop_domain`, `next_hop_category` |
 | `custom.exchange.queue.count`, `.total_messages` | |
 | `custom.exchange.queue.named.*` | |
 | `custom.exchange.queue.digest.messages` (only with `-IncludeDigest` on the wrapper) | `delivery_type`, `status` |
-| `custom.exchange.db.copy_queue_length`, `.replay_queue_length`, `.mounted` | `database`, `copy_status` |
+| `custom.exchange.db.copy_queue_length`, `.replay_queue_length`, `.mounted` | `database.copy`, `database.name`, `database.status` |
 | `custom.exchange.submission.*` | |
 | `custom.exchange.service.running`, `.present` | `service`, `label` |
 | `custom.exchange.cluster.network_up` | `network` |

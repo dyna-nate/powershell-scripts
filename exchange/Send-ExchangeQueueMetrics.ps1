@@ -77,16 +77,16 @@ try {
     $json = & $collector @collectorArgs | Out-String
     $data = $json | ConvertFrom-Json
     if ($data.server) { $server = [string]$data.server }
-    $srv = @{ server = $server }
+    $srv = @{ "exchange.server" = $server }
 
     foreach ($q in @($data.queues)) {
         $d = @{
-            server        = $server
-            queue         = $q.Identity
-            delivery_type = $q.DeliveryType
-            status        = $q.Status
-            next_hop      = $q.NextHopDomain
-            next_hop_category = $q.NextHopCategory
+            "exchange.server"   = $server
+            "queue.identity"    = $q.Identity
+            delivery_type       = $q.DeliveryType
+            status              = $q.Status
+            next_hop_domain     = $q.NextHopDomain
+            next_hop_category   = $q.NextHopCategory
         }
         Add-Metric "queue.messages"      $q.MessageCount $d
         Add-Metric "queue.deferred"      $q.DeferredMessageCount $d
@@ -104,11 +104,12 @@ try {
 
     foreach ($r in @($data.digest)) {
         Add-Metric "queue.digest.messages" $r.MessageCount @{
-            server = $server; delivery_type = $r.DeliveryType; status = $r.Status }
+            "exchange.server" = $server; delivery_type = $r.DeliveryType; status = $r.Status }
     }
 
     foreach ($db in @($data.databases)) {
-        $d = @{ server = $server; database = $db.DatabaseName; copy_status = $db.status }
+        $d = @{ "exchange.server" = $server; "database.copy" = $db.name; "database.name" = $db.databaseName
+                "database.status" = $db.status }
         Add-Metric "db.copy_queue_length"   $db.copyQueueLength $d
         Add-Metric "db.replay_queue_length" $db.replayQueueLength $d
         Add-Metric "db.mounted"             $db.mounted $d
@@ -121,12 +122,12 @@ try {
     }
 
     foreach ($s in @($data.services)) {
-        $d = @{ server = $server; service = $s.name; label = $s.label }
+        $d = @{ "exchange.server" = $server; service = $s.name; label = $s.label }
         Add-Metric "service.running" $s.running $d
         Add-Metric "service.present" $s.present $d
     }
     foreach ($n in @($data.clusterNetworks)) {
-        Add-Metric "cluster.network_up" $n.up @{ server = $server; network = $n.name }
+        Add-Metric "cluster.network_up" $n.up @{ "exchange.server" = $server; network = $n.name }
     }
     foreach ($w in @($data.meta.packWarnings)) {
         Write-Host "collector warning: $w"
@@ -135,10 +136,10 @@ try {
 }
 catch {
     Write-Host "Collection failed: $($_.Exception.Message)"
-    Add-Metric "collector.success" 0 @{ server = $server }
+    Add-Metric "collector.success" 0 @{ "exchange.server" = $server }
     $failed = $true
 }
-Add-Metric "collector.duration_ms" $sw.ElapsedMilliseconds @{ server = $server }
+Add-Metric "collector.duration_ms" $sw.ElapsedMilliseconds @{ "exchange.server" = $server }
 
 if ($DryRun) {
     $lines
