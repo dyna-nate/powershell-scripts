@@ -23,6 +23,8 @@
 
 .PARAMETER Endpoint
     OneAgent metric ingest URL.
+.PARAMETER Environment
+    Value of the exchange.environment dimension, added to every metric. Default "onprem".
 .PARAMETER Prefix
     Metric key prefix. Default "custom.exchange".
 .PARAMETER DryRun
@@ -37,6 +39,7 @@
 [CmdletBinding()]
 param(
     [string]$Endpoint = "http://127.0.0.1:14499/metrics/ingest",
+    [string]$Environment = "onprem",
     [string]$Prefix = "custom.exchange",
     [switch]$DryRun,
     [switch]$ExcludeEmpty,
@@ -83,6 +86,8 @@ function Add-Metric {
     if ($null -eq $Value) { return }
     try { $num = [double]$Value } catch { return }
     if ([double]::IsNaN($num) -or [double]::IsInfinity($num)) { return }
+    $Dims = $Dims.Clone()
+    $Dims["exchange.environment"] = $Environment
     $dimText = ($Dims.GetEnumerator() | Where-Object { "$($_.Value)" -ne "" } | Sort-Object Name |
         ForEach-Object { "{0}={1}" -f $_.Name, (ConvertTo-DimValue $_.Value) }) -join ","
     $head = if ($dimText) { "$Prefix.$Key,$dimText" } else { "$Prefix.$Key" }

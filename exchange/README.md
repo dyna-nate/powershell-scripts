@@ -101,7 +101,7 @@ search the Metrics app for `custom.exchange.`.
 
 ## Metrics
 
-All are gauges with an `exchange.server` dimension. Keys and dimensions mirror `ExtensionYAML/extension.yaml`. `failed.persec` and `collector.*` are not in the extension.
+All are gauges with the dimensions `exchange.server` and `exchange.environment` (`onprem`, change it with `-Environment` on the wrapper). Keys and dimensions mirror `ExtensionYAML/extension.yaml`. `failed.persec` and `collector.*` are not in the extension.
 
 | Metric | Extra dimensions |
 |---|---|
