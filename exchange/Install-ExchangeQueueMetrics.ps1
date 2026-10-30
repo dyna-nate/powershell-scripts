@@ -241,7 +241,7 @@ try {
         if (-not ($metricLines | Where-Object { $_ -like "custom.exchange.$m,*" })) { Fail "Collector output has no custom.exchange.$m." }
     }
     Ok "queue metrics present"
-    foreach ($m in @(@("queue.named.", "named queue aggregates"), @("db.", "database copies"),
+    foreach ($m in @(@("queue.poison.", "named queue aggregates"), @("database.", "database copies"),
                      @("submission.", "performance counters"), @("service.running", "service states"))) {
         if ($metricLines | Where-Object { $_ -like "custom.exchange.$($m[0])*" }) { Ok $m[1] }
         else { Write-Host "   WARN no $($m[1]) in the output" -ForegroundColor Yellow }
@@ -293,4 +293,4 @@ if ($linesOk -ne $sent -or $linesBad -ne 0) {
 Ok "first run succeeded, OneAgent accepted all $linesOk lines"
 $plain = $null
 
-Write-Host "`nDone. Metrics are under 'custom.exchange.*' (e.g. custom.exchange.queue.messages, custom.exchange.collector.success)." -ForegroundColor Green
+Write-Host "`nDone. Metrics are under 'custom.exchange.*' (e.g. custom.exchange.queue.message_count, custom.exchange.collector.success)." -ForegroundColor Green

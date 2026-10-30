@@ -77,15 +77,15 @@ timeseries success = max(custom.exchange.collector.success), by: {exchange.serve
 ```
 Queue depth per queue:
 ```
-timeseries messages = max(custom.exchange.queue.messages), by:{exchange.server, queue.identity, delivery_type}
+timeseries messages = max(custom.exchange.queue.message_count), by:{exchange.server, queue.identity, delivery_type}
 ```
 Named queue aggregates (poison, submission, mailbox delivery, remote delivery):
 ```
-timeseries v = max(custom.exchange.queue.named.poison_length), by: {exchange.server}
+timeseries v = max(custom.exchange.queue.poison.length), by: {exchange.server}
 ```
 Database copies (mailbox servers only):
 ```
-timeseries copyQueue = max(custom.exchange.db.copy_queue_length), by:{exchange.server, database.copy}
+timeseries copyQueue = max(custom.exchange.database.copy_queue_length), by:{exchange.server, database.copy}
 ```
 Service states, `1` is running:
 ```
@@ -101,18 +101,18 @@ search the Metrics app for `custom.exchange.`.
 
 ## Metrics
 
-All are gauges with an `exchange.server` dimension.
+All are gauges with an `exchange.server` dimension. Keys and dimensions mirror `ExtensionYAML/extension.yaml`. `failed.persec` and `collector.*` are not in the extension.
 
 | Metric | Extra dimensions |
 |---|---|
-| `custom.exchange.queue.messages`, `.deferred`, `.locked`, `.incoming_rate`, `.outgoing_rate`, `.velocity` | `queue.identity`, `delivery_type`, `status`, `next_hop_domain`, `next_hop_category` |
+| `custom.exchange.queue.message_count`, `.deferred_count`, `.locked_count`, `.incoming_rate`, `.outgoing_rate`, `.velocity` | `queue.identity`, `delivery_type`, `status`, `next_hop_domain`, `next_hop_category` |
 | `custom.exchange.queue.count`, `.total_messages` | |
-| `custom.exchange.queue.named.*` | |
-| `custom.exchange.queue.digest.messages` (only with `-IncludeDigest` on the wrapper) | `delivery_type`, `status` |
-| `custom.exchange.db.copy_queue_length`, `.replay_queue_length`, `.mounted` | `database.copy`, `database.name`, `database.status` |
-| `custom.exchange.submission.*` | |
+| `custom.exchange.queue.poison.length`, `.submission.length`, `.submission.deferred`, `.active.mailbox.length`, `.external.active.length`, `.external.total.length`, `.internal.active.length`, `.internal.total.length`, `.retry.mailbox.length` | |
+| `custom.exchange.queue.digest.message_count` (only with `-IncludeDigest` on the wrapper) | `delivery_type`, `status` |
+| `custom.exchange.database.copy_queue_length`, `.replay_queue_length`, `.mounted` | `database.copy`, `database.name`, `database.status` |
+| `custom.exchange.submission.successful.persec`, `.temp_failures.persec`, `.hub_servers_in_retry`, `.failed.persec`, `custom.exchange.is.messages_queued_for_submission` | |
 | `custom.exchange.service.running`, `.present` | `service`, `label` |
-| `custom.exchange.cluster.network_up` | `network` |
+| `custom.exchange.cluster.network.up` | `network` |
 | `custom.exchange.collector.success`, `.duration_ms` | |
 
 Each distinct queue, database and service is its own series and counts toward custom metric consumption.

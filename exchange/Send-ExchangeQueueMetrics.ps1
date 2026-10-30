@@ -8,14 +8,17 @@
     protocol (MINT) lines and POSTs them to the OneAgent local metric API
     (http://127.0.0.1:14499/metrics/ingest by default). The OneAgent adds the host dimensions.
 
-    Metrics (all gauges):
-      custom.exchange.queue.messages / .deferred / .locked / .incoming_rate / .outgoing_rate / .velocity
+    Metrics (all gauges; keys and dimensions mirror ExtensionYAML/extension.yaml):
+      custom.exchange.queue.message_count / .deferred_count / .locked_count / .incoming_rate / .outgoing_rate / .velocity
       custom.exchange.queue.total_messages / .count                  (per server)
-      custom.exchange.queue.named.<aggregate>                        (poison, submission, ... per server)
-      custom.exchange.db.copy_queue_length / .replay_queue_length / .mounted
-      custom.exchange.submission.<counter>                           (perf counters, per server)
+      custom.exchange.queue.poison.length, .submission.length, .submission.deferred, .active.mailbox.length,
+        .external.active.length, .external.total.length, .internal.active.length, .internal.total.length,
+        .retry.mailbox.length                                        (per server)
+      custom.exchange.database.copy_queue_length / .replay_queue_length / .mounted
+      custom.exchange.submission.successful.persec / .temp_failures.persec / .hub_servers_in_retry / .failed.persec
+      custom.exchange.is.messages_queued_for_submission
       custom.exchange.service.running / .present
-      custom.exchange.cluster.network_up
+      custom.exchange.cluster.network.up
       custom.exchange.collector.success / .duration_ms
 
 .PARAMETER Endpoint
@@ -47,6 +50,26 @@ $ErrorActionPreference = "Stop"
 $inv = [System.Globalization.CultureInfo]::InvariantCulture
 $collector = Join-Path $PSScriptRoot "Get-ExchangeQueues.ps1"
 $lines = New-Object System.Collections.Generic.List[string]
+
+# Metric keys mirror ExtensionYAML/extension.yaml (the same keys the Python extension reports).
+$namedKeys = @{
+    poisonLength                 = "queue.poison.length"
+    submissionLength             = "queue.submission.length"
+    submissionDeferred           = "queue.submission.deferred"
+    activeMailboxDelivery        = "queue.active.mailbox.length"
+    externalActiveRemoteDelivery = "queue.external.active.length"
+    externalRemoteDeliveryTotal  = "queue.external.total.length"
+    internalActiveRemoteDelivery = "queue.internal.active.length"
+    internalRemoteDeliveryTotal  = "queue.internal.total.length"
+    mailboxRetryDelivery         = "queue.retry.mailbox.length"
+}
+$counterKeys = @{
+    successfulSubmissionsPerSec       = "submission.successful.persec"
+    temporarySubmissionFailuresPerSec = "submission.temp_failures.persec"
+    failedSubmissionsPerSec           = "submission.failed.persec"      # not in the YAML
+    hubServersInRetry                 = "submission.hub_servers_in_retry"
+    messagesQueuedForSubmission       = "is.messages_queued_for_submission"
+}
 
 function ConvertTo-DimValue {
     param($Value)
@@ -88,9 +111,9 @@ try {
             next_hop_domain     = $q.NextHopDomain
             next_hop_category   = $q.NextHopCategory
         }
-        Add-Metric "queue.messages"      $q.MessageCount $d
-        Add-Metric "queue.deferred"      $q.DeferredMessageCount $d
-        Add-Metric "queue.locked"        $q.LockedMessageCount $d
+        Add-Metric "queue.message_count"  $q.MessageCount $d
+        Add-Metric "queue.deferred_count" $q.DeferredMessageCount $d
+        Add-Metric "queue.locked_count"   $q.LockedMessageCount $d
         Add-Metric "queue.incoming_rate" $q.IncomingRate $d
         Add-Metric "queue.outgoing_rate" $q.OutgoingRate $d
         Add-Metric "queue.velocity"      $q.Velocity $d
@@ -99,25 +122,25 @@ try {
     Add-Metric "queue.total_messages" $data.meta.totalMessageCount $srv
 
     foreach ($p in $data.namedQueues.PSObject.Properties) {
-        Add-Metric ("queue.named." + ($p.Name -creplace '([A-Z])', '_$1').ToLower()) $p.Value $srv
+        if ($namedKeys.ContainsKey($p.Name)) { Add-Metric $namedKeys[$p.Name] $p.Value $srv }
     }
 
     foreach ($r in @($data.digest)) {
-        Add-Metric "queue.digest.messages" $r.MessageCount @{
+        Add-Metric "queue.digest.message_count" $r.MessageCount @{
             "exchange.server" = $server; delivery_type = $r.DeliveryType; status = $r.Status }
     }
 
     foreach ($db in @($data.databases)) {
         $d = @{ "exchange.server" = $server; "database.copy" = $db.name; "database.name" = $db.databaseName
                 "database.status" = $db.status }
-        Add-Metric "db.copy_queue_length"   $db.copyQueueLength $d
-        Add-Metric "db.replay_queue_length" $db.replayQueueLength $d
-        Add-Metric "db.mounted"             $db.mounted $d
+        Add-Metric "database.copy_queue_length"   $db.copyQueueLength $d
+        Add-Metric "database.replay_queue_length" $db.replayQueueLength $d
+        Add-Metric "database.mounted"       $db.mounted $d
     }
 
     if ($data.counters) {
         foreach ($p in $data.counters.PSObject.Properties) {
-            Add-Metric ("submission." + ($p.Name -creplace '([A-Z])', '_$1').ToLower()) $p.Value $srv
+            if ($counterKeys.ContainsKey($p.Name)) { Add-Metric $counterKeys[$p.Name] $p.Value $srv }
         }
     }
 
@@ -127,7 +150,7 @@ try {
         Add-Metric "service.present" $s.present $d
     }
     foreach ($n in @($data.clusterNetworks)) {
-        Add-Metric "cluster.network_up" $n.up @{ "exchange.server" = $server; network = $n.name }
+        Add-Metric "cluster.network.up" $n.up @{ "exchange.server" = $server; network = $n.name }
     }
     foreach ($w in @($data.meta.packWarnings)) {
         Write-Host "collector warning: $w"
