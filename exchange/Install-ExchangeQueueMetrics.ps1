@@ -174,6 +174,20 @@ function Register-MetricsTask {
     catch { Fail "Could not register task '$Name' as $($Credential.UserName): $($_.Exception.Message)" }
 }
 
+function Assert-TriggerAccepted {
+    # The scheduler accepts a task whose trigger it cannot schedule and only logs event 113
+    # ("not all specified triggers will start the task"). The task then never runs. Catch that here
+    # instead of waiting for a run that cannot happen. Silent if the log is unavailable.
+    param([string]$Name, [datetime]$Since)
+    Start-Sleep -Seconds 2
+    $ev = Get-WinEvent -FilterHashtable @{ LogName = "Microsoft-Windows-TaskScheduler/Operational"; Id = 113; StartTime = $Since } -ErrorAction SilentlyContinue |
+        Where-Object { $_.Message -like "*\$Name*" } | Select-Object -First 1
+    if ($ev) {
+        $detail = $ev.Message -replace '\s+', ' '
+        Fail "Task Scheduler registered '$Name' but rejected its trigger, so it will never run (event 113: $detail). This is a Windows Task Scheduler problem on this server. Restart the server and run the installer again."
+    }
+}
+
 function Remove-MetricsTask {
     param([string]$Name)
     try { $taskRoot.DeleteTask($Name, 0) } catch { }
@@ -209,7 +223,9 @@ Step "Testing the collector as $($Credential.UserName)"
 try {
     Remove-Item -LiteralPath $testLog -Force -ErrorAction SilentlyContinue
     $cmd = "& { & '$sendScript'$extra -DryRun } *> '$testLog'"
+    $regAt = (Get-Date).AddSeconds(-2)
     Register-MetricsTask -Name $testTask -Arguments "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"$cmd`"" -RepeatMinutes 1
+    Assert-TriggerAccepted -Name $testTask -Since $regAt
     Write-Host "   test task starts on its own trigger in about a minute..."
     $code = Wait-TaskRun -Name $testTask
     $out = if (Test-Path -LiteralPath $testLog) { Get-Content -LiteralPath $testLog -Raw } else { "" }
@@ -243,6 +259,7 @@ $cmd = "& { & '$sendScript'$extra } *> '$logFile'"
 Remove-Item -LiteralPath $logFile -Force -ErrorAction SilentlyContinue
 $registeredAt = Get-Date
 Register-MetricsTask -Name $TaskName -Arguments "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"$cmd`"" -RepeatMinutes $IntervalMinutes
+Assert-TriggerAccepted -Name $TaskName -Since $registeredAt.AddSeconds(-2)
 Ok "registered"
 
 # The task fires about a minute after registration. Confirm that from the log it writes: on some
