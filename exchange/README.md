@@ -101,11 +101,12 @@ search the Metrics app for `custom.exchange.`.
 
 ## Metrics
 
-All are gauges with the dimensions `exchange.server` and `environment` (`onprem`, change it with `-Environment` on the wrapper). Keys and dimensions mirror `ExtensionYAML/extension.yaml`. `failed.persec` and `collector.*` are not in the extension.
+All are gauges with the dimensions `exchange.server` and `exchange.environment` (`onprem`, change it with `-Environment` on the wrapper). Keys and dimensions mirror `ExtensionYAML/extension.yaml`. `failed.persec` and `collector.*` are not in the extension.
 
 | Metric | Extra dimensions |
 |---|---|
 | `custom.exchange.queue.message_count`, `.deferred_count`, `.locked_count`, `.incoming_rate`, `.outgoing_rate`, `.velocity` | `queue.identity`, `delivery_type`, `status`, `next_hop_domain`, `next_hop_category`, `mail_path` |
+| `custom.exchange.queue.error` (1 only for queues with a `LastError`) | same as above, plus `last_error` |
 | `custom.exchange.queue.count`, `.total_messages` | |
 | `custom.exchange.hybrid.outbound.message_count`, `.retry_messages` | `mail_path` (always `hybrid_outbound`) |
 | `custom.exchange.queue.poison.length`, `.submission.length`, `.submission.deferred`, `.active.mailbox.length`, `.external.active.length`, `.external.total.length`, `.internal.active.length`, `.internal.total.length`, `.retry.mailbox.length` | |

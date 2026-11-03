@@ -10,6 +10,7 @@
 
     Metrics (all gauges; keys and dimensions mirror ExtensionYAML/extension.yaml):
       custom.exchange.queue.message_count / .deferred_count / .locked_count / .incoming_rate / .outgoing_rate / .velocity
+      custom.exchange.queue.error                                    (1 per queue that reports a LastError; dim last_error)
       custom.exchange.queue.total_messages / .count                  (per server)
       custom.exchange.hybrid.outbound.message_count / .retry_messages (per server, mail_path=hybrid_outbound)
       custom.exchange.queue.poison.length, .submission.length, .submission.deferred, .active.mailbox.length,
@@ -28,7 +29,7 @@
     CSV of Exchange Online hop suffixes. Queues whose NextHopDomain or Identity matches get
     mail_path=hybrid_outbound. Default "mail.protection.outlook.com,mail.eo.outlook.com,protection.outlook.com".
 .PARAMETER Environment
-    Value of the environment dimension, added to every metric. Default "onprem".
+    Value of the exchange.environment dimension, added to every metric. Default "onprem".
 .PARAMETER Prefix
     Metric key prefix. Default "custom.exchange".
 .PARAMETER DryRun
@@ -121,7 +122,7 @@ function Add-Metric {
     try { $num = [double]$Value } catch { return }
     if ([double]::IsNaN($num) -or [double]::IsInfinity($num)) { return }
     $Dims = $Dims.Clone()
-    $Dims["environment"] = $Environment
+    $Dims["exchange.environment"] = $Environment
     $dimText = ($Dims.GetEnumerator() | Where-Object { "$($_.Value)" -ne "" } | Sort-Object Name |
         ForEach-Object { "{0}={1}" -f $_.Name, (ConvertTo-DimValue $_.Value) }) -join ","
     $head = if ($dimText) { "$Prefix.$Key,$dimText" } else { "$Prefix.$Key" }
@@ -163,6 +164,11 @@ try {
         Add-Metric "queue.incoming_rate" $q.IncomingRate $d
         Add-Metric "queue.outgoing_rate" $q.OutgoingRate $d
         Add-Metric "queue.velocity"      $q.Velocity $d
+        if ($q.LastError) {
+            $de = $d.Clone()
+            $de["last_error"] = $q.LastError
+            Add-Metric "queue.error" 1 $de
+        }
     }
     $hy = @{ "exchange.server" = $server; mail_path = "hybrid_outbound" }
     Add-Metric "hybrid.outbound.message_count" $hybridMessages $hy
