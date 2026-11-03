@@ -28,7 +28,7 @@
     CSV of Exchange Online hop suffixes. Queues whose NextHopDomain or Identity matches get
     mail_path=hybrid_outbound. Default "mail.protection.outlook.com,mail.eo.outlook.com,protection.outlook.com".
 .PARAMETER Environment
-    Value of the exchange.environment dimension, added to every metric. Default "onprem".
+    Value of the environment dimension, added to every metric. Default "onprem".
 .PARAMETER Prefix
     Metric key prefix. Default "custom.exchange".
 .PARAMETER DryRun
@@ -121,7 +121,7 @@ function Add-Metric {
     try { $num = [double]$Value } catch { return }
     if ([double]::IsNaN($num) -or [double]::IsInfinity($num)) { return }
     $Dims = $Dims.Clone()
-    $Dims["exchange.environment"] = $Environment
+    $Dims["environment"] = $Environment
     $dimText = ($Dims.GetEnumerator() | Where-Object { "$($_.Value)" -ne "" } | Sort-Object Name |
         ForEach-Object { "{0}={1}" -f $_.Name, (ConvertTo-DimValue $_.Value) }) -join ","
     $head = if ($dimText) { "$Prefix.$Key,$dimText" } else { "$Prefix.$Key" }
