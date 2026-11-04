@@ -7,6 +7,7 @@ documents itself with comment-based help (`Get-Help .\<script>.ps1 -Full`).
 |---|---|
 | [`exchange/Get-ExchangeQueues.ps1`](exchange/Get-ExchangeQueues.ps1) | Collects Exchange transport queue, database copy, performance counter and service health data and prints it as one JSON object. |
 | [`exchange/Send-ExchangeQueueMetrics.ps1`](exchange/Send-ExchangeQueueMetrics.ps1) | Runs the collector and sends the result to the local OneAgent as MINT metrics. Meant for a Scheduled Task. |
+| [`exchange/Send-ExchangeMailboxMetrics.ps1`](exchange/Send-ExchangeMailboxMetrics.ps1) | Optional. Reads `Get-MailboxStatistics` and sends the top 50 mailboxes by size plus per-database totals as MINT metrics. Separate, slower Scheduled Task. |
 | [`exchange/Install-ExchangeQueueMetrics.ps1`](exchange/Install-ExchangeQueueMetrics.ps1) | One-shot installer for an Exchange server: downloads the scripts, checks OneAgent/MINT, tests the credentials, registers the Scheduled Task. |
 
 ## exchange/Get-ExchangeQueues.ps1

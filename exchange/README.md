@@ -121,6 +121,44 @@ All are gauges with the dimensions `exchange.server` and `exchange.environment` 
 
 Each distinct queue, database and service is its own series and counts toward custom metric consumption.
 
+## Mailbox size and activity (optional)
+
+Add `-IncludeMailboxStats` to the installer command to also report mailbox size and activity from
+`Get-MailboxStatistics`. It installs a second Scheduled Task, `Dynatrace-ExchangeQueueMetrics-Mailbox`
+(default every 30 minutes, `-MailboxIntervalMinutes`), because reading every mailbox is slow on large servers.
+The installer waits up to 10 minutes for its first run and only warns if it is late.
+
+- The service account needs a role that can read mailbox statistics, for example *View-Only Recipients*.
+- The top 50 mailboxes by size per server get their own series (`-TopMailboxes` changes the number). Databases
+  are totalled over all mailboxes.
+- **Mailbox display names are stored in Dynatrace** in the `mailbox.name` dimension. Do not enable this where
+  that is not allowed.
+- Series count per server: about 5 per top mailbox plus 3 per database.
+
+| Metric | Dimensions |
+|---|---|
+| `custom.exchange.mailbox.total_item_size_bytes`, `.total_deleted_item_size_bytes`, `.item_count` | `mailbox.name`, `database.name` |
+| `custom.exchange.mailbox.last_logon_age_seconds` (not sent for a mailbox that never logged on) | `mailbox.name`, `database.name` |
+| `custom.exchange.mailbox.over_limit` (`0` or `1`) | `mailbox.name`, `database.name`, `storage_limit_status` |
+| `custom.exchange.database.mailbox_count`, `.mailbox_total_size_bytes`, `.mailbox_total_item_count` | `database.name` |
+| `custom.exchange.mailbox.collector.success`, `.duration_ms`, `.mailboxes_scanned` | |
+
+All carry `exchange.server` and `environment`. `storage_limit_status` is `BelowLimit`, `IssueWarning`,
+`ProhibitSend`, `MailboxDisabled` or `NoChecking`; `over_limit` is `1` for the middle three.
+
+```
+timeseries size = max(custom.exchange.mailbox.total_item_size_bytes, scalar: true), by:{exchange.server, mailbox.name, database.name}, from: now() - 2h
+| sort size desc | limit 10
+```
+
+Try it without scheduling anything:
+
+```powershell
+C:\ProgramData\Dynatrace\ExchangeQueueMetrics\Send-ExchangeMailboxMetrics.ps1 -DryRun
+```
+
+The notebook has a section for each of these metrics.
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
@@ -130,11 +168,13 @@ Each distinct queue, database and service is its own series and counts toward cu
 | Collector test fails as the service account | Password wrong, account lacks *Log on as a batch job*, or lacks Exchange permission. The installer prints the task result and log tail. |
 | Task result is not `0` later on | Read `last-run.log`. Expired password on the service account is the usual cause. |
 | `linesInvalid` above 0 | A metric line was rejected. Keep the `last-run.log` and report it. |
+| Mailbox run fails | The account cannot read mailbox statistics (add *View-Only Recipients*), or the Exchange Management Shell is not available to the task. Read `last-mailbox-run.log`. |
 | Gaps in the data | A run took longer than the interval; use a larger `-IntervalMinutes`. Check `custom.exchange.collector.duration_ms`. |
 
 ## Uninstall
 
 ```powershell
 schtasks /delete /tn "Dynatrace-ExchangeQueueMetrics" /f
+schtasks /delete /tn "Dynatrace-ExchangeQueueMetrics-Mailbox" /f   # only if you used -IncludeMailboxStats
 Remove-Item C:\ProgramData\Dynatrace\ExchangeQueueMetrics -Recurse
 ```

@@ -8,7 +8,7 @@
     {
       "id": "1",
       "type": "markdown",
-      "markdown": "# Exchange queue metrics: ingest validation\nRun the sections top to bottom after the install. Allow 2 to 3 minutes after the first task run.\n\n- **Section 2**: every `custom.exchange.*` metric key the tenant has received. Compare with the metrics table in `exchange/README.md`.\n- **Sections 3 and 4**: data points per metric in the last 15 minutes (about 15 is healthy, `last_success` should be 1). A 0 in a `db_*` column is normal on a non-mailbox server.\n- **Sections 5 to 7**: collector health over time, queue depth and service states.\n- **Sections 8 and 9**: submission performance counters over time, and Exchange services that are installed but not running (all 34 monitored services).\n- **Sections 10 to 14**: dimension checks. Every dimension from the extension (`exchange.server`, `exchange.environment`, `queue.identity`, `next_hop_domain`, `mail_path`, `database.copy`, `database.name`, `database.status`, ...) should be filled in. A `null` or `0` in these tables means the dimension is missing."
+      "markdown": "# Exchange queue metrics: ingest validation\nRun the sections top to bottom after the install. Allow 2 to 3 minutes after the first task run.\n\n- **Section 2**: every `custom.exchange.*` metric key the tenant has received. Compare with the metrics table in `exchange/README.md`.\n- **Sections 3 and 4**: data points per metric in the last 15 minutes (about 15 is healthy, `last_success` should be 1). A 0 in a `db_*` column is normal on a non-mailbox server.\n- **Sections 5 to 7**: collector health over time, queue depth and service states.\n- **Sections 8 and 9**: submission performance counters over time, and Exchange services that are installed but not running (all 34 monitored services).\n- **Sections 10 to 14**: dimension checks. Every dimension from the extension (`exchange.server`, `exchange.environment`, `queue.identity`, `next_hop_domain`, `mail_path`, `database.copy`, `database.name`, `database.status`, ...) should be filled in. A `null` or `0` in these tables means the dimension is missing.\n- **Sections 16 to 22**: mailbox size and activity (optional, installer switch `-IncludeMailboxStats`). These metrics refresh every 30 minutes, so the queries look back 2 hours. Skip them if you did not install the mailbox task."
     },
     {
       "id": "2",
@@ -303,6 +303,149 @@
         "visualization": "table",
         "visualizationSettings": {
           "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "16",
+      "type": "markdown",
+      "markdown": "## Mailbox metrics (optional)\nSent by `Send-ExchangeMailboxMetrics.ps1`: the top 50 mailboxes by size per server, plus a total per database. Allow up to 30 to 40 minutes after the install for the second run, and use the 2 hour window below. Mailbox display names are stored in the `mailbox.name` dimension."
+    },
+    {
+      "id": "17",
+      "type": "dql",
+      "title": "Mailbox dimensions: series with each dimension filled in (every count should equal series)",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries size = max(custom.exchange.mailbox.total_item_size_bytes, scalar: true),\n  by: {exchange.server, environment, mailbox.name, database.name}, from: now() - 2h\n| summarize series = count(),\n    exchange_server = countIf(isNotNull(exchange.server)),\n    environment = countIf(isNotNull(environment)),\n    mailbox_name = countIf(isNotNull(mailbox.name)),\n    database_name = countIf(isNotNull(database.name))"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "18",
+      "type": "dql",
+      "title": "Top mailboxes by size",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries {\n  sizeBytes = max(custom.exchange.mailbox.total_item_size_bytes, scalar: true),\n  deletedBytes = max(custom.exchange.mailbox.total_deleted_item_size_bytes, scalar: true),\n  items = max(custom.exchange.mailbox.item_count, scalar: true),\n  lastLogonSeconds = max(custom.exchange.mailbox.last_logon_age_seconds, scalar: true)\n}, by: {exchange.server, mailbox.name, database.name}, from: now() - 2h\n| fieldsAdd sizeGB = round(sizeBytes / 1073741824, decimals: 2),\n            deletedGB = round(deletedBytes / 1073741824, decimals: 2),\n            daysSinceLogon = round(lastLogonSeconds / 86400, decimals: 1)\n| sort sizeBytes desc\n| limit 50\n| fields exchange.server, mailbox.name, database.name, sizeGB, deletedGB, items, daysSinceLogon"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "19",
+      "type": "dql",
+      "title": "Mailboxes at or over a storage limit (empty is good)",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries over = max(custom.exchange.mailbox.over_limit, scalar: true),\n  by: {exchange.server, mailbox.name, database.name, storage_limit_status}, from: now() - 2h\n| filter over == 1\n| sort storage_limit_status asc, mailbox.name asc"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "20",
+      "type": "dql",
+      "title": "Per-database totals (all mailboxes)",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries {\n  mailboxes = max(custom.exchange.database.mailbox_count, scalar: true),\n  sizeBytes = max(custom.exchange.database.mailbox_total_size_bytes, scalar: true),\n  items = max(custom.exchange.database.mailbox_total_item_count, scalar: true)\n}, by: {exchange.server, database.name}, from: now() - 2h\n| fieldsAdd sizeGB = round(sizeBytes / 1073741824, decimals: 2)\n| sort sizeBytes desc\n| fields exchange.server, database.name, mailboxes, sizeGB, items"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "21",
+      "type": "dql",
+      "title": "Mailbox collector: mailboxes scanned and run time",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries {\n  success = min(custom.exchange.mailbox.collector.success, scalar: true),\n  scanned = max(custom.exchange.mailbox.collector.mailboxes_scanned, scalar: true),\n  durationMs = max(custom.exchange.mailbox.collector.duration_ms, scalar: true)\n}, by: {exchange.server, environment}, from: now() - 2h\n| fieldsAdd durationSeconds = round(durationMs / 1000, decimals: 1)\n| fields exchange.server, environment, success, scanned, durationSeconds"
+        },
+        "visualization": "table",
+        "visualizationSettings": {
+          "autoSelectVisualization": true,
+          "chartSettings": {}
+        },
+        "querySettings": {
+          "maxResultRecords": 1000,
+          "defaultScanLimitGbytes": 500,
+          "maxResultMegaBytes": 1,
+          "defaultSamplingRatio": 10,
+          "enableSampling": false
+        }
+      }
+    },
+    {
+      "id": "22",
+      "type": "dql",
+      "title": "Mailbox collector success per server (1 = ok, one point per run)",
+      "showInput": true,
+      "state": {
+        "input": {
+          "value": "timeseries success = max(custom.exchange.mailbox.collector.success), by: {exchange.server}, from: now() - 12h, interval: 30m"
+        },
+        "visualization": "lineChart",
+        "visualizationSettings": {
+          "autoSelectVisualization": false,
           "chartSettings": {}
         },
         "querySettings": {

@@ -29,6 +29,14 @@
     Pass -ExcludeEmpty to the collector (recommended, fewer queue series).
 .PARAMETER HybridHopDomains
     CSV of Exchange Online hop suffixes for the mail_path dimension. Empty uses the wrapper default.
+.PARAMETER IncludeMailboxStats
+    Also install a second, slower task (Send-ExchangeMailboxMetrics.ps1) that reports mailbox size and
+    activity (Get-MailboxStatistics) for the largest mailboxes. Mailbox display names are sent to Dynatrace.
+    The account needs a role that can read mailbox statistics, for example View-Only Recipients.
+.PARAMETER TopMailboxes
+    How many of the largest mailboxes get their own series (default 50).
+.PARAMETER MailboxIntervalMinutes
+    How often the mailbox task runs (default 30).
 .PARAMETER SkipDownload
     Use the scripts already in InstallPath.
 #>
@@ -44,6 +52,9 @@ param(
     [string]$Endpoint = "http://127.0.0.1:14499/metrics/ingest",
     [switch]$ExcludeEmpty,
     [string]$HybridHopDomains = "",
+    [switch]$IncludeMailboxStats,
+    [int]$TopMailboxes = 50,
+    [int]$MailboxIntervalMinutes = 30,
     [switch]$SkipDownload
 )
 
@@ -51,7 +62,9 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $files = @("exchange/Get-ExchangeQueues.ps1", "exchange/Send-ExchangeQueueMetrics.ps1")
+if ($IncludeMailboxStats) { $files += "exchange/Send-ExchangeMailboxMetrics.ps1" }
 $sendScript = Join-Path $InstallPath "Send-ExchangeQueueMetrics.ps1"
+$mailboxScript = Join-Path $InstallPath "Send-ExchangeMailboxMetrics.ps1"
 $ps = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
 
 function Step { param([string]$m) Write-Host "`n== $m" -ForegroundColor Cyan }
@@ -298,6 +311,38 @@ if ($linesOk -ne $sent -or $linesBad -ne 0) {
     Fail "OneAgent accepted $linesOk of $sent lines ($linesBad invalid). See $logFile."
 }
 Ok "first run succeeded, OneAgent accepted all $linesOk lines"
+
+if ($IncludeMailboxStats) {
+    $mailboxTask = "$TaskName-Mailbox"
+    $mailboxLog = Join-Path $InstallPath "last-mailbox-run.log"
+    Step "Registering scheduled task '$mailboxTask' every $MailboxIntervalMinutes min (top $TopMailboxes mailboxes)"
+    $cmd = "& { & '$mailboxScript' -TopMailboxes $TopMailboxes } *> '$mailboxLog'"
+    Remove-Item -LiteralPath $mailboxLog -Force -ErrorAction SilentlyContinue
+    $mailboxRegisteredAt = Get-Date
+    Register-MetricsTask -Name $mailboxTask -Arguments "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"$cmd`"" -RepeatMinutes $MailboxIntervalMinutes
+    Assert-TriggerAccepted -Name $mailboxTask -Since $mailboxRegisteredAt.AddSeconds(-2)
+    Ok "registered"
+    # Reading every mailbox can take minutes on a large server, so a slow first run is a warning.
+    Write-Host "   waiting for the first mailbox run (up to 10 minutes)..."
+    $deadline = (Get-Date).AddMinutes(10)
+    $mailboxTxt = ""
+    while ((Get-Date) -lt $deadline) {
+        if ((Test-Path -LiteralPath $mailboxLog) -and (Get-Item -LiteralPath $mailboxLog).LastWriteTime -ge $mailboxRegisteredAt.AddSeconds(-2)) {
+            $mailboxTxt = Get-Content -LiteralPath $mailboxLog -Raw
+            if ($mailboxTxt -match '"linesInvalid"\s*:\s*\d+' -or $mailboxTxt -match 'Collection failed') { break }
+        }
+        Start-Sleep -Seconds 5
+    }
+    if ($mailboxTxt -match 'Collection failed') {
+        Write-Host "   WARN the mailbox run failed (the queue metrics are fine):`n$mailboxTxt" -ForegroundColor Yellow
+    }
+    elseif ($mailboxTxt -match 'HTTP 202' -and $mailboxTxt -match '"linesInvalid"\s*:\s*0\b') {
+        Ok "mailbox run succeeded: $(([regex]::Match($mailboxTxt, 'Sent (\d+) lines')).Groups[1].Value) lines accepted"
+    }
+    else {
+        Write-Host "   WARN no finished mailbox run yet. Check $mailboxLog later." -ForegroundColor Yellow
+    }
+}
 $plain = $null
 
 Write-Host "`nDone. Metrics are under 'custom.exchange.*' (e.g. custom.exchange.queue.message_count, custom.exchange.collector.success)." -ForegroundColor Green
