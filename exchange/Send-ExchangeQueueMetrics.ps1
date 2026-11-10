@@ -19,7 +19,7 @@
       custom.exchange.database.copy_queue_length / .replay_queue_length / .mounted
       custom.exchange.submission.successful.persec / .temp_failures.persec / .hub_servers_in_retry / .failed.persec
       custom.exchange.is.messages_queued_for_submission
-      custom.exchange.service.running / .present
+      custom.exchange.service.running / .present            (service.name, service.label, service.status)
       custom.exchange.cluster.network.up
       custom.exchange.collector.success / .duration_ms
 
@@ -200,7 +200,7 @@ try {
     }
 
     foreach ($s in @($data.services)) {
-        $d = @{ "exchange.server" = $server; service = $s.name; label = $s.label }
+        $d = @{ "exchange.server" = $server; "service.name" = $s.name; "service.label" = $s.label; "service.status" = $s.status }
         Add-Metric "service.running" $s.running $d
         Add-Metric "service.present" $s.present $d
     }

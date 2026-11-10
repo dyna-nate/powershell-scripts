@@ -132,7 +132,7 @@
       "showInput": true,
       "state": {
         "input": {
-          "value": "timeseries running = min(custom.exchange.service.running, scalar: true), by: {exchange.server, service}, from: now() - 15m\n| sort running asc, service asc"
+          "value": "timeseries running = min(custom.exchange.service.running, scalar: true), by: {exchange.server, service.name, service.label}, from: now() - 15m\n| sort running asc, service.name asc"
         },
         "visualization": "table",
         "visualizationSettings": {
@@ -178,7 +178,7 @@
       "showInput": true,
       "state": {
         "input": {
-          "value": "timeseries {\n  running = min(custom.exchange.service.running, scalar: true),\n  present = max(custom.exchange.service.present, scalar: true)\n}, by: {exchange.server, service, label}, from: now() - 15m\n| filter present == 1 and running == 0\n| sort server asc, service asc"
+          "value": "timeseries {\n  running = min(custom.exchange.service.running, scalar: true),\n  present = max(custom.exchange.service.present, scalar: true)\n}, by: {exchange.server, service.name, service.label, service.status}, from: now() - 15m\n| filter present == 1 and running == 0\n| sort exchange.server asc, service.name asc"
         },
         "visualization": "table",
         "visualizationSettings": {

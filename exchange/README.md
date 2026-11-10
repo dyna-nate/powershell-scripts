@@ -89,7 +89,7 @@ timeseries copyQueue = max(custom.exchange.database.copy_queue_length), by:{exch
 ```
 Service states, `1` is running:
 ```
-timeseries running = min(custom.exchange.service.running), by: {exchange.server, service}
+timeseries running = min(custom.exchange.service.running), by: {exchange.server, service.name}
 ```
 Metrics are also tagged with the OneAgent host, so you can filter on `dt.entity.host`. To list everything sent,
 search the Metrics app for `custom.exchange.`.
@@ -113,7 +113,7 @@ All are gauges with the dimensions `exchange.server` and `exchange.environment` 
 | `custom.exchange.queue.digest.message_count` (only with `-IncludeDigest` on the wrapper) | `delivery_type`, `status` |
 | `custom.exchange.database.copy_queue_length`, `.replay_queue_length`, `.mounted` | `database.copy`, `database.name`, `database.status` |
 | `custom.exchange.submission.successful.persec`, `.temp_failures.persec`, `.hub_servers_in_retry`, `.failed.persec`, `custom.exchange.is.messages_queued_for_submission` | |
-| `custom.exchange.service.running`, `.present` | `service`, `label` |
+| `custom.exchange.service.running`, `.present` | `service.name` (Windows service name), `service.label` (friendly name), `service.status` (`Running`, `Stopped`, `NotInstalled`, `Paused`, ...) |
 | `custom.exchange.cluster.network.up` | `network` |
 | `custom.exchange.collector.success`, `.duration_ms` | |
 
