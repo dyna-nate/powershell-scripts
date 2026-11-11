@@ -68,8 +68,9 @@ cd C:\Temp\ExchangeMetrics
 and does the rest as normal. To update, copy the new files over the old ones in that folder and run the same
 command again. It replaces the scripts and the tasks and nothing else changes.
 
-To build the bundle on your own machine: `zip exchange-metrics.zip exchange/*.ps1`
-(or download the repo as a zip from GitHub).
+A ready-made bundle with all four scripts and an `INSTALL.txt` is in the repo at
+[dist/ExchangeQueueMetrics.zip](dist/ExchangeQueueMetrics.zip). Download it, hand it to the customer, and they extract it and
+run the command above. After changing a script, run `exchange/build-package.sh` and commit the new zip.
 
 To try the metrics without scheduling anything:
 
