@@ -13,3 +13,6 @@ exq_diag_*/
 *.cer
 *.secret
 .env
+
+# Prebuilt offline installer package (rebuild with exchange/build-package.sh)
+!exchange/dist/ExchangeQueueMetrics.zip
