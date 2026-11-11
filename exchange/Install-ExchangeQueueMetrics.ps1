@@ -38,7 +38,8 @@
 .PARAMETER MailboxIntervalMinutes
     How often the mailbox task runs (default 30).
 .PARAMETER SkipDownload
-    Use the scripts already in InstallPath.
+    Do not download. Copy the scripts that sit next to this installer into InstallPath (or use the ones
+    already in InstallPath when the installer is run from there). For servers that cannot reach GitHub.
 #>
 [CmdletBinding()]
 param(
@@ -82,7 +83,18 @@ if ($IntervalMinutes -lt 1) { Fail "IntervalMinutes must be at least 1." }
 Step "Downloading scripts from github.com/$Repo@$Branch"
 New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
 if ($SkipDownload) {
-    Ok "skipped, using $InstallPath"
+    $here = $PSScriptRoot
+    foreach ($f in $files) {
+        $name = Split-Path $f -Leaf
+        $src = if ($here) { Join-Path $here $name } else { $null }
+        $dst = Join-Path $InstallPath $name
+        if ($src -and (Test-Path -LiteralPath $src) -and ((Resolve-Path -LiteralPath $src).Path -ne (Join-Path (Resolve-Path -LiteralPath $InstallPath).Path $name))) {
+            Copy-Item -LiteralPath $src -Destination $dst -Force
+            Unblock-File -LiteralPath $dst
+            Ok "$name copied from $here"
+        }
+        else { Ok "$name already in $InstallPath" }
+    }
 }
 else {
     $token = $null

@@ -54,6 +54,23 @@ It stops at the first failed check and creates no recurring task unless all chec
 `-IntervalMinutes`, `-Branch`, `-InstallPath`, `-TaskName`, `-Endpoint`, `-SkipDownload`. Running it again
 replaces the existing task. Leave `-ExcludeEmpty` on to keep the number of queue series down.
 
+### Server without access to GitHub
+
+Copy the four `.ps1` files from the `exchange` folder (or the extracted repo zip) to any folder on the server,
+for example `C:\Temp\ExchangeMetrics`, then run the installer from that folder:
+
+```powershell
+cd C:\Temp\ExchangeMetrics
+.\Install-ExchangeQueueMetrics.ps1 -SkipDownload -Credential (Get-Credential) -ExcludeEmpty -IncludeMailboxStats
+```
+
+`-SkipDownload` copies the scripts that sit next to the installer into `C:\ProgramData\Dynatrace\ExchangeQueueMetrics`
+and does the rest as normal. To update, copy the new files over the old ones in that folder and run the same
+command again. It replaces the scripts and the tasks and nothing else changes.
+
+To build the bundle on your own machine: `zip exchange-metrics.zip exchange/*.ps1`
+(or download the repo as a zip from GitHub).
+
 To try the metrics without scheduling anything:
 
 ```powershell
