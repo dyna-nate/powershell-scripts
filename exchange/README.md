@@ -143,7 +143,7 @@ The installer waits up to 10 minutes for its first run and only warns if it is l
 | `custom.exchange.database.mailbox_count`, `.mailbox_total_size_bytes`, `.mailbox_total_item_count` | `database.name` |
 | `custom.exchange.mailbox.collector.success`, `.duration_ms`, `.mailboxes_scanned` | |
 
-All carry `exchange.server` and `environment`. `storage_limit_status` is `BelowLimit`, `IssueWarning`,
+All carry `exchange.server` and `exchange.environment`. `storage_limit_status` is `BelowLimit`, `IssueWarning`,
 `ProhibitSend`, `MailboxDisabled` or `NoChecking`; `over_limit` is `1` for the middle three.
 
 ```

@@ -326,7 +326,7 @@
       "showInput": true,
       "state": {
         "input": {
-          "value": "timeseries size = max(custom.exchange.mailbox.total_item_size_bytes, scalar: true),\n  by: {exchange.server, environment, mailbox.name, database.name}, from: now() - 2h\n| summarize series = count(),\n    exchange_server = countIf(isNotNull(exchange.server)),\n    environment = countIf(isNotNull(environment)),\n    mailbox_name = countIf(isNotNull(mailbox.name)),\n    database_name = countIf(isNotNull(database.name))"
+          "value": "timeseries size = max(custom.exchange.mailbox.total_item_size_bytes, scalar: true),\n  by: {exchange.server, exchange.environment, mailbox.name, database.name}, from: now() - 2h\n| summarize series = count(),\n    exchange_server = countIf(isNotNull(exchange.server)),\n    exchange_environment = countIf(isNotNull(exchange.environment)),\n    mailbox_name = countIf(isNotNull(mailbox.name)),\n    database_name = countIf(isNotNull(database.name))"
         },
         "visualization": "table",
         "visualizationSettings": {
@@ -418,7 +418,7 @@
       "showInput": true,
       "state": {
         "input": {
-          "value": "timeseries {\n  success = min(custom.exchange.mailbox.collector.success, scalar: true),\n  scanned = max(custom.exchange.mailbox.collector.mailboxes_scanned, scalar: true),\n  durationMs = max(custom.exchange.mailbox.collector.duration_ms, scalar: true)\n}, by: {exchange.server, environment}, from: now() - 2h\n| fieldsAdd durationSeconds = round(durationMs / 1000, decimals: 1)\n| fields exchange.server, environment, success, scanned, durationSeconds"
+          "value": "timeseries {\n  success = min(custom.exchange.mailbox.collector.success, scalar: true),\n  scanned = max(custom.exchange.mailbox.collector.mailboxes_scanned, scalar: true),\n  durationMs = max(custom.exchange.mailbox.collector.duration_ms, scalar: true)\n}, by: {exchange.server, exchange.environment}, from: now() - 2h\n| fieldsAdd durationSeconds = round(durationMs / 1000, decimals: 1)\n| fields exchange.server, exchange.environment, success, scanned, durationSeconds"
         },
         "visualization": "table",
         "visualizationSettings": {

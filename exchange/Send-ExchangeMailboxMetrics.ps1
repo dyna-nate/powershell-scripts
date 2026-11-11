@@ -11,14 +11,14 @@
       - the top N mailboxes by TotalItemSize (default 50), one series per mailbox and metric
       - a total per database, over all mailboxes
 
-    Metrics (all gauges, prefix custom.exchange). Per mailbox, dimensions exchange.server, environment,
+    Metrics (all gauges, prefix custom.exchange). Per mailbox, dimensions exchange.server, exchange.environment,
     mailbox.name (display name) and database.name:
       mailbox.total_item_size_bytes / .total_deleted_item_size_bytes / .item_count
       mailbox.last_logon_age_seconds   (left out when the mailbox has never been logged on to)
       mailbox.over_limit               (0 or 1, extra dimension storage_limit_status)
-    Per database, dimensions exchange.server, environment, database.name:
+    Per database, dimensions exchange.server, exchange.environment, database.name:
       database.mailbox_count / .mailbox_total_size_bytes / .mailbox_total_item_count
-    Health, dimensions exchange.server, environment:
+    Health, dimensions exchange.server, exchange.environment:
       mailbox.collector.success / .duration_ms / .mailboxes_scanned
 
     Mailbox display names become dimension values, so they are stored in Dynatrace.
@@ -30,7 +30,7 @@
 .PARAMETER Prefix
     Metric key prefix. Default "custom.exchange".
 .PARAMETER Environment
-    Value of the environment dimension. Default "onprem".
+    Value of the exchange.environment dimension. Default "onprem".
 .PARAMETER DryRun
     Print the MINT lines to stdout and do not send them.
 #>
@@ -62,7 +62,7 @@ function Add-Metric {
     if ([double]::IsNaN($num) -or [double]::IsInfinity($num)) { return }
     $Dims = $Dims.Clone()
     $Dims["exchange.server"] = $server
-    $Dims["environment"] = $Environment
+    $Dims["exchange.environment"] = $Environment
     $dimText = ($Dims.GetEnumerator() | Where-Object { "$($_.Value)" -ne "" } | Sort-Object Name |
         ForEach-Object { "{0}={1}" -f $_.Name, (ConvertTo-DimValue $_.Value) }) -join ","
     $lines.Add(("{0}.{1},{2} gauge,{3}" -f $Prefix, $Key, $dimText, $num.ToString("R", $inv)))
