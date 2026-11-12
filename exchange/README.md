@@ -32,14 +32,14 @@ protocol, "MINT").
 - Its password is stored by the Task Scheduler. Use a dedicated account.
 
 **Install access**
-- A GitHub token with read access to the repository, supplied by whoever gave you the install command.
+- Access to github.com (the repository is public, no token needed). Without it, use the zip install below.
 
 ## Install
 
-Run on the Exchange server in an elevated PowerShell. Replace `<TOKEN>`.
+Run on the Exchange server in an elevated PowerShell.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol='Tls12'; $t='<TOKEN>'; Invoke-WebRequest "https://api.github.com/repos/dyna-nate/powershell-scripts/contents/exchange/Install-ExchangeQueueMetrics.ps1?ref=main" -Headers @{Authorization="Bearer $t";Accept="application/vnd.github.raw"} -OutFile "$env:TEMP\Install-ExchangeQueueMetrics.ps1" -UseBasicParsing; $env:GITHUB_TOKEN=$t; & "$env:TEMP\Install-ExchangeQueueMetrics.ps1" -Credential (Get-Credential) -ExcludeEmpty
+[Net.ServicePointManager]::SecurityProtocol='Tls12'; Invoke-WebRequest "https://raw.githubusercontent.com/dyna-nate/powershell-scripts/main/exchange/Install-ExchangeQueueMetrics.ps1" -OutFile "$env:TEMP\Install-ExchangeQueueMetrics.ps1" -UseBasicParsing; & "$env:TEMP\Install-ExchangeQueueMetrics.ps1" -Credential (Get-Credential) -ExcludeEmpty
 ```
 
 A credential prompt appears: enter the service account (`DOMAIN\user`). The installer then:
@@ -181,7 +181,7 @@ The notebook has a section for each of these metrics.
 
 | Symptom | Likely cause |
 |---|---|
-| Download fails with 404 | Token missing, expired, or without read access to the repo. |
+| Download fails | The server cannot reach github.com (proxy or firewall), or GitHub's anonymous API limit was hit (60 requests per hour per address). Use the zip install. |
 | "Nothing is listening on 127.0.0.1:14499" | OneAgent metric API not enabled, or a different port is configured. Use `-Endpoint`. |
 | Collector test fails as the service account | Password wrong, account lacks *Log on as a batch job*, or lacks Exchange permission. The installer prints the task result and log tail. |
 | Task result is not `0` later on | Read `last-run.log`. Expired password on the service account is the usual cause. |

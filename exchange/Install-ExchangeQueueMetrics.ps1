@@ -16,7 +16,7 @@
     Account the task runs as. Needs Exchange permission for Get-Queue and the
     "Log on as a batch job" right.
 .PARAMETER GitHubToken
-    Token with read access to the repo (it is private). Defaults to $env:GITHUB_TOKEN.
+    Optional. Not needed while the repo is public. Defaults to $env:GITHUB_TOKEN.
 .PARAMETER Repo
     owner/name of the GitHub repo.
 .PARAMETER Branch
@@ -113,7 +113,7 @@ else {
             Invoke-WebRequest -Uri $uri -Headers $headers -OutFile $tmp -UseBasicParsing -TimeoutSec 60
         }
         catch {
-            $hint = if (-not $token) { " (no token supplied; a private repo returns 404 without one)" } else { "" }
+            $hint = if (-not $token) { " (no token supplied; if the repo is private again, pass -GitHubToken)" } else { "" }
             Fail "Download of $f failed: $($_.Exception.Message)$hint"
         }
         $text = Get-Content -LiteralPath $tmp -Raw
