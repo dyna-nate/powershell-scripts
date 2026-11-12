@@ -374,6 +374,7 @@ function Get-ServiceSnapshot {
     # installed: Get-Command may auto-load the module, and without a cluster the result is empty anyway.
     $swCluster = [System.Diagnostics.Stopwatch]::StartNew()
     $clusterNetworks = @()
+    $clusterNodes = @()
     $clusterInstalled = [bool]($services | Where-Object { $_.name -eq 'ClusSvc' -and $_.present -eq 1 })
     if ($clusterInstalled -and (Get-Command Get-ClusterNetwork -ErrorAction SilentlyContinue)) {
         try {
@@ -390,11 +391,26 @@ function Get-ServiceSnapshot {
             $clusterNetworks = @()
         }
     }
+    if ($clusterInstalled -and (Get-Command Get-ClusterNode -ErrorAction SilentlyContinue)) {
+        try {
+            $clusterNodes = @(Get-ClusterNode -ErrorAction Stop | ForEach-Object {
+                [PSCustomObject]@{
+                    name  = [string]$_.Name
+                    state = [string]$_.State
+                    up    = $(if ([string]$_.State -eq 'Up') { 1 } else { 0 })
+                }
+            })
+        }
+        catch {
+            $clusterNodes = @()
+        }
+    }
     Write-Trace "Get-ServiceSnapshot: cluster networks (clusterInstalled=$clusterInstalled) took $($swCluster.ElapsedMilliseconds) ms"
 
     return [PSCustomObject]@{
         services         = $services
         clusterNetworks  = $clusterNetworks
+        clusterNodes     = $clusterNodes
     }
 }
 
@@ -540,6 +556,7 @@ function Get-ExchangeHealthSnapshot {
         counters    = $counters
         services    = if ($serviceBlock) { $serviceBlock.services } else { @() }
         clusterNetworks = if ($serviceBlock) { $serviceBlock.clusterNetworks } else { @() }
+        clusterNodes    = if ($serviceBlock) { $serviceBlock.clusterNodes } else { @() }
         meta        = [PSCustomObject]@{
             queueCount        = $queues.Count
             totalMessageCount = [int](($queues | Measure-Object -Property MessageCount -Sum).Sum)

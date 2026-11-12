@@ -21,6 +21,7 @@
       custom.exchange.is.messages_queued_for_submission
       custom.exchange.service.running / .present            (service.name, service.label, service.status)
       custom.exchange.cluster.network.up
+      ms-exchange.cluster.node.state                                 (per cluster node; 1 = Up, dims cluster.node.name / cluster.node.state)
       custom.exchange.collector.success / .duration_ms
 
 .PARAMETER Endpoint
@@ -117,7 +118,7 @@ function Get-MailPath {
 }
 
 function Add-Metric {
-    param([string]$Key, $Value, [hashtable]$Dims = @{})
+    param([string]$Key, $Value, [hashtable]$Dims = @{}, [string]$FullKey)
     if ($null -eq $Value) { return }
     try { $num = [double]$Value } catch { return }
     if ([double]::IsNaN($num) -or [double]::IsInfinity($num)) { return }
@@ -125,7 +126,8 @@ function Add-Metric {
     $Dims["exchange.environment"] = $Environment
     $dimText = ($Dims.GetEnumerator() | Where-Object { "$($_.Value)" -ne "" } | Sort-Object Name |
         ForEach-Object { "{0}={1}" -f $_.Name, (ConvertTo-DimValue $_.Value) }) -join ","
-    $head = if ($dimText) { "$Prefix.$Key,$dimText" } else { "$Prefix.$Key" }
+    $metricKey = if ($FullKey) { $FullKey } else { "$Prefix.$Key" }
+    $head = if ($dimText) { "$metricKey,$dimText" } else { $metricKey }
     $lines.Add(("{0} gauge,{1}" -f $head, $num.ToString("R", $inv)))
 }
 
@@ -212,6 +214,11 @@ try {
     }
     foreach ($n in @($data.clusterNetworks)) {
         Add-Metric "cluster.network.up" $n.up @{ "exchange.server" = $server; network = $n.name }
+    }
+    # Per-node state under the ms-exchange prefix (not $Prefix), as the app's cluster query reads it.
+    # 1 = Up, 0 = any other state; the state text is the cluster.node.state dimension.
+    foreach ($n in @($data.clusterNodes)) {
+        Add-Metric "" $n.up @{ "exchange.server" = $server; "cluster.node.name" = $n.name; "cluster.node.state" = $n.state } -FullKey "ms-exchange.cluster.node.state"
     }
     foreach ($w in @($data.meta.packWarnings)) {
         Write-Host "collector warning: $w"
