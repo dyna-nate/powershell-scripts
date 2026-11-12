@@ -51,5 +51,10 @@ Start-Process msiexec.exe -ArgumentList "/i `"$dl\rewrite_amd64_en-US.msi`" /qn"
 Start-Process "$dl\vcredist2012_x64.exe" -ArgumentList '/install /quiet /norestart' -Wait
 Start-Process "$dl\vcredist2013_x64.exe" -ArgumentList '/install /quiet /norestart' -Wait
 
-# 5. Join the domain and rename (prompts for domain admin credentials), then reboot
-Add-Computer -DomainName $DomainName -NewName $NewName -Credential (Get-Credential "$DomainName\Administrator") -Restart
+# 5. Join the domain and rename, then reboot. Ask for the credential here and stop if none is given
+# (an empty or cancelled prompt returns $null; if you cancelled, re-run just this step:
+#  Add-Computer -DomainName lab.local -NewName NKEXCH02 -Credential (Get-Credential) -Restart)
+if ((Get-CimInstance Win32_ComputerSystem).PartOfDomain) { Write-Host "Already domain-joined, nothing to do."; return }
+$cred = Get-Credential -UserName "$DomainName\Administrator" -Message "Domain admin for $DomainName"
+if (-not $cred) { throw "No credential entered. Re-run the script, or run the Add-Computer line in the comment above." }
+Add-Computer -DomainName $DomainName -NewName $NewName -Credential $cred -Restart
