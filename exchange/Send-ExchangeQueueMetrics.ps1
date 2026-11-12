@@ -197,6 +197,12 @@ try {
         foreach ($p in $data.counters.PSObject.Properties) {
             if ($counterKeys.ContainsKey($p.Name)) { Add-Metric $counterKeys[$p.Name] $p.Value $srv }
         }
+        # '\MSExchange Mail Submission(*)\Hub Servers In Retry' does not exist on Exchange 2016/2019 (no Hub
+        # Transport role). The app queries all four counters in one timeseries, so a missing series blanks the
+        # whole row. Report 0 (no hub servers in retry) when the other counters are present.
+        if ($null -eq $data.counters.hubServersInRetry -and $null -ne $data.counters.successfulSubmissionsPerSec) {
+            Add-Metric $counterKeys["hubServersInRetry"] 0 $srv
+        }
     }
 
     foreach ($s in @($data.services)) {
