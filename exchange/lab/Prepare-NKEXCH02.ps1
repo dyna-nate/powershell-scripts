@@ -4,7 +4,7 @@
 $ErrorActionPreference = 'Stop'
 # --- Edit these ---
 $DomainName   = 'lab.local'          # your AD domain FQDN
-$DnsServers   = @('10.0.0.4')        # your DC's IP
+$DnsServers   = @('10.50.0.4')       # DC NateKunz-AD.lab.local
 $NewName      = 'NKEXCH02'
 $SetIpInGuest = $false               # leave $false on Azure; set DNS on the VNet/NIC instead
 $InterfaceAlias = 'Ethernet'

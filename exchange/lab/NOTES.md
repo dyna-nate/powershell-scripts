@@ -43,7 +43,7 @@ New server target: Windows Server 2025 Datacenter Azure Edition, on-prem only.
 
 ## Prepare-NKEXCH02.ps1: what happened on the first run
 
-- Edit `$DomainName` and `$DnsServers` first. `10.0.0.4` is a placeholder, not a real DC.
+- Edit `$DomainName` and `$DnsServers` first. The lab DC is NateKunz-AD.lab.local at `10.50.0.4` (the script now has it; `10.0.0.4` was a placeholder).
 - `Web-Lgcy-Mgmt-Console` is not a valid feature name on Server 2025, so the first
   `Install-WindowsFeature` call failed as a whole and installed nothing. The script now skips
   feature names the OS does not have and warns about them. Other IIS names may be missing too.
