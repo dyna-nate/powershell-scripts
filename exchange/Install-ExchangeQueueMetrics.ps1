@@ -110,7 +110,18 @@ else {
         $tmp = Join-Path $InstallPath "$name.download"
         $uri = "https://api.github.com/repos/$Repo/contents/${f}?ref=$Branch"
         try {
-            Invoke-WebRequest -Uri $uri -Headers $headers -OutFile $tmp -UseBasicParsing -TimeoutSec 60
+            try {
+                Invoke-WebRequest -Uri $uri -Headers $headers -OutFile $tmp -UseBasicParsing -TimeoutSec 60
+            }
+            catch {
+                # A stale or wrong token makes GitHub answer 401 even for a public repo: retry without it.
+                if ($token -and "$($_.Exception.Message)" -match '401|403|404') {
+                    Write-Host "   token was rejected, retrying $name without it" -ForegroundColor Yellow
+                    $anon = @{ Accept = $headers.Accept; "User-Agent" = $headers."User-Agent" }
+                    Invoke-WebRequest -Uri $uri -Headers $anon -OutFile $tmp -UseBasicParsing -TimeoutSec 60
+                }
+                else { throw }
+            }
         }
         catch {
             $hint = if (-not $token) { " (no token supplied; if the repo is private again, pass -GitHubToken)" } else { "" }
