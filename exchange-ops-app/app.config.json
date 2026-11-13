@@ -1,0 +1,22 @@
+{
+    "environmentUrl":  "https://tbj60588.apps.dynatrace.com",
+    "app":  {
+                "id":  "my.exchange.ops",
+                "name":  "Exchange Ops",
+                "version":  "1.1.17",
+                "description":  "Monitor Exchange Get-Queue and hybrid mail-path health with Dynatrace Grail",
+                "scopes":  [
+                               {
+                                   "name":  "storage:buckets:read",
+                                   "comment":  "Read Grail buckets"
+                               },
+                               {
+                                   "name":  "storage:metrics:read",
+                                   "comment":  "Read custom.exchange.* metrics"
+                               }
+                           ]
+            },
+    "build":  {
+                  "sourceRoot":  "./"
+              }
+}

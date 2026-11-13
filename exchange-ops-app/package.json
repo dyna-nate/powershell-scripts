@@ -1,0 +1,32 @@
+{
+  "name": "exchange-ops",
+  "version": "1.1.6",
+  "description": "Enterprise Exchange transport queue operations and troubleshooting",
+  "private": true,
+  "scripts": {
+    "start": "dt-app dev",
+    "build": "dt-app build",
+    "deploy": "dt-app deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dynatrace-sdk/client-query": "^1.27.0",
+    "@dynatrace-sdk/react-hooks": "^1.14.2",
+    "@dynatrace/strato-components": "^3.12.0",
+    "@dynatrace/strato-components-preview": "^3.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
+  },
+  "devDependencies": {
+    "@dynatrace/devkit": "^0.3.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "dt-app": "^1.15.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.5"
+  }
+}

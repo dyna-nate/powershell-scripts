@@ -1,6 +1,6 @@
 # PowerShell scripts
 
-A private collection of PowerShell scripts. Each script lives in a folder named after its area and
+A collection of PowerShell scripts, plus the Dynatrace app that reads their metrics. Each script lives in a folder named after its area and
 documents itself with comment-based help (`Get-Help .\<script>.ps1 -Full`).
 
 | Script | Purpose |
@@ -9,6 +9,19 @@ documents itself with comment-based help (`Get-Help .\<script>.ps1 -Full`).
 | [`exchange/Send-ExchangeQueueMetrics.ps1`](exchange/Send-ExchangeQueueMetrics.ps1) | Runs the collector and sends the result to the local OneAgent as MINT metrics. Meant for a Scheduled Task. |
 | [`exchange/Send-ExchangeMailboxMetrics.ps1`](exchange/Send-ExchangeMailboxMetrics.ps1) | Optional. Reads `Get-MailboxStatistics` and sends the top 50 mailboxes by size plus per-database totals as MINT metrics. Separate, slower Scheduled Task. |
 | [`exchange/Install-ExchangeQueueMetrics.ps1`](exchange/Install-ExchangeQueueMetrics.ps1) | One-shot installer for an Exchange server: downloads the scripts, checks OneAgent/MINT, tests the credentials, registers the Scheduled Task. |
+
+## exchange-ops-app
+
+The **Exchange Ops** Dynatrace app (React and Strato, built with `dt-app`). It reads the
+`custom.exchange.*` metrics these scripts send and shows queues, hybrid mail flow, database copies,
+services, infrastructure and mailboxes. See [`exchange-ops-app/README.md`](exchange-ops-app/README.md).
+
+```
+cd exchange-ops-app && npm ci && npm test && npm run build
+```
+
+Deploy with the scripts in `exchange-ops-app/scripts/` (they read a platform token from the environment;
+never put a token in a file). `node_modules/`, `dist/`, `out/` and the `.dt-app/` token store are git-ignored.
 
 ## exchange/Get-ExchangeQueues.ps1
 

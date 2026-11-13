@@ -16,3 +16,9 @@ exq_diag_*/
 
 # Prebuilt offline installer package (rebuild with exchange/build-package.sh)
 !exchange/dist/ExchangeQueueMetrics.zip
+
+# Dynatrace app (exchange-ops-app): build output, dependencies and the CLI's token store
+node_modules/
+.dt-app/
+exchange-ops-app/dist/
+exchange-ops-app/out/
