@@ -14,13 +14,13 @@ documents itself with comment-based help (`Get-Help .\<script>.ps1 -Full`).
 
 The **Exchange Ops** Dynatrace app (React and Strato, built with `dt-app`). It reads the
 `custom.exchange.*` metrics these scripts send and shows queues, hybrid mail flow, database copies,
-services, infrastructure and mailboxes. See [`exchange-ops-app/README.md`](exchange-ops-app/README.md).
+services, infrastructure and mailboxes. See [`exchange/exchange-ops-app/README.md`](exchange/exchange-ops-app/README.md).
 
 ```
-cd exchange-ops-app && npm ci && npm test && npm run build
+cd exchange/exchange-ops-app && npm ci && npm test && npm run build
 ```
 
-Set `environmentUrl` in `exchange-ops-app/app.config.json` to your tenant (it ships as `YOUR_ENV_ID`; keep your real value out of commits). Deploy with the scripts in `exchange-ops-app/scripts/` (they read a platform token from the environment;
+Set `environmentUrl` in `exchange/exchange-ops-app/app.config.json` to your tenant (it ships as `YOUR_ENV_ID`; keep your real value out of commits). Deploy with the scripts in `exchange/exchange-ops-app/scripts/` (they read a platform token from the environment;
 never put a token in a file). `node_modules/`, `dist/`, `out/` and the `.dt-app/` token store are git-ignored.
 
 ## exchange/Get-ExchangeQueues.ps1
