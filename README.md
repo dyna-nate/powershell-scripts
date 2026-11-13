@@ -20,7 +20,7 @@ services, infrastructure and mailboxes. See [`exchange-ops-app/README.md`](excha
 cd exchange-ops-app && npm ci && npm test && npm run build
 ```
 
-Deploy with the scripts in `exchange-ops-app/scripts/` (they read a platform token from the environment;
+Set `environmentUrl` in `exchange-ops-app/app.config.json` to your tenant (it ships as `YOUR_ENV_ID`; keep your real value out of commits). Deploy with the scripts in `exchange-ops-app/scripts/` (they read a platform token from the environment;
 never put a token in a file). `node_modules/`, `dist/`, `out/` and the `.dt-app/` token store are git-ignored.
 
 ## exchange/Get-ExchangeQueues.ps1

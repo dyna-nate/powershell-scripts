@@ -1,5 +1,5 @@
 {
-    "environmentUrl":  "https://tbj60588.apps.dynatrace.com",
+    "environmentUrl":  "https://YOUR_ENV_ID.apps.dynatrace.com",
     "app":  {
                 "id":  "my.exchange.ops",
                 "name":  "Exchange Ops",
