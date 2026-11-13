@@ -62,3 +62,18 @@ New server target: Windows Server 2025 Datacenter Azure Edition, on-prem only.
 - `exchange.environment` is hardcoded in `metrics.py` (`onprem` / `online`), not configurable.
 - `mail_path` is classified per queue in `mail_path.py`; the only setting is `hybridHopDomains`.
 - 1.2.17's docs only mention Exchange 2019 and Online. Check that it collects correctly on SE.
+
+## Load test (queues and Mail-Flow data)
+
+`Invoke-ExchangeLoadTest.ps1` fills the queues with messages that cannot be delivered: it creates `LT-*` Send
+connectors to an unused smart host (default 10.50.0.250) and drops messages into the local Pickup folder.
+Run it in an elevated PowerShell on an Exchange server (NKEXCH01 is enough; run `-Action Start` on both servers to load both):
+
+```powershell
+.\Invoke-ExchangeLoadTest.ps1 -Action Start -MessageCount 300   # create connectors, send, list queues
+.\Invoke-ExchangeLoadTest.ps1 -Action Status                    # queues on every server
+.\Invoke-ExchangeLoadTest.ps1 -Action Cleanup                   # delete test messages, then the connectors
+```
+
+partner1.example and partner2.example queue as `external_other`; contoso-com.mail.protection.outlook.com queues as
+`hybrid_outbound`. Not run against a real server when written; check `Get-TransportService | fl PickupDirectoryPath` if nothing is picked up.
