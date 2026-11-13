@@ -425,7 +425,7 @@ ${filterParts.join("\n")}
 export function dqlClusterNetworks(): string {
   return `
 timeseries {Running = avg(\`ms-exchange.cluster.node.state\`), timestamp = start()},
-  from: now()-3m, to: now(), interval: 1m,
+  from: now()-5m, to: now(), interval: 1m,
   by: {NODE = cluster.node.name, STATE = cluster.node.state}
 | fields data = record(Running = Running[], timestamp = timestamp[], NODE, STATE)
 | expand data
