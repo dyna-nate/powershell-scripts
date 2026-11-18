@@ -39,7 +39,7 @@ protocol, "MINT").
 Run on the Exchange server in an elevated PowerShell.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol='Tls12'; Invoke-WebRequest "https://raw.githubusercontent.com/dyna-nate/powershell-scripts/main/exchange/Install-ExchangeQueueMetrics.ps1" -OutFile "$env:TEMP\Install-ExchangeQueueMetrics.ps1" -UseBasicParsing; & "$env:TEMP\Install-ExchangeQueueMetrics.ps1" -Credential (Get-Credential) -ExcludeEmpty
+[Net.ServicePointManager]::SecurityProtocol='Tls12'; Invoke-WebRequest "https://raw.githubusercontent.com/dyna-nate/powershell-scripts/main/exchange/Install-ExchangeQueueMetrics.ps1" -OutFile "$env:TEMP\Install-ExchangeQueueMetrics.ps1" -UseBasicParsing; & "$env:TEMP\Install-ExchangeQueueMetrics.ps1" -Credential (Get-Credential) -ExcludeEmpty -IncludeMailboxStats
 ```
 
 A credential prompt appears: enter the service account (`DOMAIN\user`). The installer then:
