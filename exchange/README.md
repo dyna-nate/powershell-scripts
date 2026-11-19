@@ -31,6 +31,30 @@ protocol, "MINT").
 - The Windows right *Log on as a batch job* on the server.
 - Its password is stored by the Task Scheduler. Use a dedicated account.
 
+**Or a group Managed Service Account (gMSA), recommended.** Active Directory generates and rotates the password, so
+nothing is typed or stored. One-time setup by an AD administrator, then on each Exchange server:
+
+```powershell
+# On a domain controller (once). Skip the KDS key if Get-KdsRootKey already returns one.
+Add-KdsRootKey -EffectiveImmediately            # wait about 10 hours; single-DC lab: -EffectiveTime (Get-Date).AddHours(-10)
+New-ADGroup -Name "DT-Exchange-Servers" -GroupScope Global -GroupCategory Security
+Add-ADGroupMember "DT-Exchange-Servers" -Members 'EXCH01$','EXCH02$'      # the Exchange computer accounts
+New-ADServiceAccount -Name svc-dtexch -DNSHostName svc-dtexch.<domain> -PrincipalsAllowedToRetrieveManagedPassword "DT-Exchange-Servers"
+# Exchange cannot add a gMSA to a role group by name: use a security group that contains it
+New-ADGroup -Name "DT-Exchange-Readers" -GroupScope Global -GroupCategory Security
+Add-ADGroupMember "DT-Exchange-Readers" -Members 'svc-dtexch$'
+
+# In the Exchange Management Shell (once)
+Add-RoleGroupMember "View-Only Organization Management" -Member "DT-Exchange-Readers"
+
+# On each Exchange server, after a restart so it picks up the group membership
+Install-ADServiceAccount svc-dtexch
+Test-ADServiceAccount svc-dtexch                # must return True
+```
+
+Then install with `-ServiceAccount DOMAIN\svc-dtexch$` instead of `-Credential` (see below). Grant *Log on as a batch
+job* if a policy restricts it.
+
 **Install access**
 - Access to github.com (the repository is public, no token needed). Without it, use the zip install below.
 
@@ -42,7 +66,10 @@ Run on the Exchange server in an elevated PowerShell.
 [Net.ServicePointManager]::SecurityProtocol='Tls12'; Invoke-WebRequest "https://raw.githubusercontent.com/dyna-nate/powershell-scripts/main/exchange/Install-ExchangeQueueMetrics.ps1" -OutFile "$env:TEMP\Install-ExchangeQueueMetrics.ps1" -UseBasicParsing; & "$env:TEMP\Install-ExchangeQueueMetrics.ps1" -Credential (Get-Credential) -ExcludeEmpty -IncludeMailboxStats
 ```
 
-A credential prompt appears: enter the service account (`DOMAIN\user`). The installer then:
+With a gMSA, replace `-Credential (Get-Credential)` with `-ServiceAccount 'DOMAIN\svc-dtexch$'` (single quotes, the trailing
+`$` is part of the name). No prompt appears and no password is stored.
+
+With `-Credential`, a credential prompt appears: enter the service account (`DOMAIN\user`). The installer then:
 
 1. Downloads the scripts to `C:\ProgramData\Dynatrace\ExchangeQueueMetrics`.
 2. Checks the OneAgent service, the metric API port, and that a probe metric is accepted.
@@ -51,7 +78,7 @@ A credential prompt appears: enter the service account (`DOMAIN\user`). The inst
    OneAgent accepted every line.
 
 It stops at the first failed check and creates no recurring task unless all checks pass. Options:
-`-IntervalMinutes`, `-Branch`, `-InstallPath`, `-TaskName`, `-Endpoint`, `-SkipDownload`. Running it again
+`-ServiceAccount`, `-IntervalMinutes`, `-Branch`, `-InstallPath`, `-TaskName`, `-Endpoint`, `-SkipDownload`. Running it again
 replaces the existing task. Leave `-ExcludeEmpty` on to keep the number of queue series down.
 
 ### Server without access to GitHub

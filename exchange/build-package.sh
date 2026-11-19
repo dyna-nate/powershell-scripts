@@ -15,6 +15,13 @@ Exchange queue and mailbox metrics for Dynatrace (offline install)
    .\Install-ExchangeQueueMetrics.ps1 -SkipDownload -Credential (Get-Credential) -ExcludeEmpty -IncludeMailboxStats
 
    Enter the service account (DOMAIN\user) when prompted. Leave out -IncludeMailboxStats to skip the mailbox task.
+
+   With a group Managed Service Account (gMSA, no password), use instead:
+
+   .\Install-ExchangeQueueMetrics.ps1 -SkipDownload -ServiceAccount 'DOMAIN\svc-dtexch$' -ExcludeEmpty -IncludeMailboxStats
+
+   (the gMSA must exist, be installed on this server with Install-ADServiceAccount, and have Exchange read-only rights;
+   see README.md in the repo)
 3. To update later, extract a newer zip over the old folder and run the same command again.
 
 Requires the Dynatrace OneAgent with the local metric API enabled (127.0.0.1:14499).

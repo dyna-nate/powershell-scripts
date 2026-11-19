@@ -8,13 +8,19 @@
       1. Download Get-ExchangeQueues.ps1 and Send-ExchangeQueueMetrics.ps1 from GitHub.
       2. Check the Dynatrace OneAgent service is running and the MINT endpoint is listening
          and accepts a metric line.
-      3. Run the collector once as -Credential through a temporary Scheduled Task (the same
-         batch logon the real task uses) and check it returns data.
+      3. Run the collector once as the task account (-Credential or -ServiceAccount) through a
+         temporary Scheduled Task (the same logon the real task uses) and check it returns data.
       4. Register the recurring Scheduled Task and start it once.
 
 .PARAMETER Credential
-    Account the task runs as. Needs Exchange permission for Get-Queue and the
-    "Log on as a batch job" right.
+    Account the task runs as, with its password. Needs Exchange permission for Get-Queue and the
+    "Log on as a batch job" right. Use this OR -ServiceAccount.
+.PARAMETER ServiceAccount
+    A group Managed Service Account (gMSA) the task runs as, as DOMAIN\name$ (for example LAB\svc-dtexch$).
+    No password is typed or stored: Active Directory manages it. Before running the installer:
+    the account must exist, this server must be allowed to retrieve its password, Install-ADServiceAccount
+    must have been run on this server, and the account needs the same Exchange read-only role as -Credential.
+    Use this OR -Credential.
 .PARAMETER GitHubToken
     Optional. Not needed while the repo is public. Defaults to $env:GITHUB_TOKEN.
 .PARAMETER Repo
@@ -41,9 +47,10 @@
     Do not download. Copy the scripts that sit next to this installer into InstallPath (or use the ones
     already in InstallPath when the installer is run from there). For servers that cannot reach GitHub.
 #>
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = "Credential")]
 param(
-    [Parameter(Mandatory)][System.Management.Automation.PSCredential]$Credential,
+    [Parameter(Mandatory, ParameterSetName = "Credential")][System.Management.Automation.PSCredential]$Credential,
+    [Parameter(Mandatory, ParameterSetName = "gMSA")][ValidatePattern('^[^\\]+\\[^\\]+\$$')][string]$ServiceAccount,
     [System.Security.SecureString]$GitHubToken,
     [string]$Repo = "dyna-nate/powershell-scripts",
     [string]$Branch = "main",
@@ -171,7 +178,24 @@ if ($resp.StatusCode -ne 202 -or $resp.Content -notmatch '"linesOk"\s*:\s*1') {
 Ok "test metric accepted (HTTP $($resp.StatusCode))"
 
 # --- 3 / 4. Scheduled tasks --------------------------------------------------------------------
-$plain = $Credential.GetNetworkCredential().Password
+if ($PSCmdlet.ParameterSetName -eq "gMSA") {
+    $runAs = $ServiceAccount
+    $plain = $null
+    $logonType = 5          # TASK_LOGON_SERVICE_ACCOUNT: password managed by Active Directory
+    if (Get-Command Test-ADServiceAccount -ErrorAction SilentlyContinue) {
+        $gmsaName = ($ServiceAccount -split '\\')[1].TrimEnd('$')
+        if (-not (Test-ADServiceAccount -Identity $gmsaName -ErrorAction SilentlyContinue)) {
+            Fail "This server cannot use the gMSA '$ServiceAccount'. Run Install-ADServiceAccount $gmsaName here and check Test-ADServiceAccount returns True (the server must be in the group allowed to retrieve the password, and restarted after joining it)."
+        }
+        Ok "gMSA $ServiceAccount is usable on this server"
+    }
+    else { Write-Host "   WARN Test-ADServiceAccount is not available (no AD module); the test run below is the check." -ForegroundColor Yellow }
+}
+else {
+    $runAs = $Credential.UserName
+    $plain = $Credential.GetNetworkCredential().Password
+    $logonType = 1          # TASK_LOGON_PASSWORD
+}
 $extra = if ($ExcludeEmpty) { " -ExcludeEmpty" } else { "" }
 if ($HybridHopDomains) {
     if ($HybridHopDomains -notmatch '^[A-Za-z0-9.,\- ]+$') { Fail "HybridHopDomains may only contain letters, digits, dots, dashes and commas." }
@@ -211,10 +235,10 @@ function Register-MetricsTask {
         $trigger.Enabled = $true
     }
     try {
-        # 6 = TASK_CREATE_OR_UPDATE, 1 = TASK_LOGON_PASSWORD
-        [void]$taskRoot.RegisterTaskDefinition($Name, $def, 6, $Credential.UserName, $plain, 1, $null)
+        # 6 = TASK_CREATE_OR_UPDATE; $logonType 1 = password, 5 = service account (gMSA, no password)
+        [void]$taskRoot.RegisterTaskDefinition($Name, $def, 6, $runAs, $plain, $logonType, $null)
     }
-    catch { Fail "Could not register task '$Name' as $($Credential.UserName): $($_.Exception.Message)" }
+    catch { Fail "Could not register task '$Name' as ${runAs}: $($_.Exception.Message)" }
 }
 
 function Assert-TriggerAccepted {
@@ -262,7 +286,7 @@ function Wait-TaskRun {
 
 $testTask = "$TaskName-InstallTest"
 $testLog = Join-Path $InstallPath "install-test.log"
-Step "Testing the collector as $($Credential.UserName)"
+Step "Testing the collector as $runAs"
 try {
     Remove-Item -LiteralPath $testLog -Force -ErrorAction SilentlyContinue
     $cmd = "& { & '$sendScript'$extra -DryRun } *> '$testLog'"
@@ -274,7 +298,7 @@ try {
     $out = if (Test-Path -LiteralPath $testLog) { Get-Content -LiteralPath $testLog -Raw } else { "" }
     if ($code -ne 0 -or $out -notmatch 'collector\.success,[^\r\n]* gauge,1\b') {
         $tail = ($out -split "`r?`n" | Select-Object -Last 15) -join "`n"
-        Fail ("Collector test failed as $($Credential.UserName) (task result 0x{0:X}). Check the password, 'Log on as a batch job', and Exchange role membership.`n{1}" -f $code, $tail)
+        Fail ("Collector test failed as $runAs (task result 0x{0:X}). Check the password (or gMSA install), 'Log on as a batch job', and Exchange role membership.`n{1}" -f $code, $tail)
     }
     $metricLines = @($out -split "`r?`n" | Where-Object { $_ -match '^custom\.exchange\.' })
     Ok "collector ran and produced $($metricLines.Count) metric lines"
