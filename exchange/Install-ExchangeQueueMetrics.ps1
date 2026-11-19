@@ -196,6 +196,12 @@ else {
     $plain = $Credential.GetNetworkCredential().Password
     $logonType = 1          # TASK_LOGON_PASSWORD
 }
+if ($PSCmdlet.ParameterSetName -eq "gMSA") {
+    # A gMSA is not an administrator: it must be able to write the run logs in the install folder.
+    & icacls.exe $InstallPath /grant "${runAs}:(OI)(CI)M" | Out-Null
+    if ($LASTEXITCODE -ne 0) { Fail "Could not grant $runAs modify access to $InstallPath." }
+    Ok "granted $runAs modify access to $InstallPath"
+}
 $extra = if ($ExcludeEmpty) { " -ExcludeEmpty" } else { "" }
 if ($HybridHopDomains) {
     if ($HybridHopDomains -notmatch '^[A-Za-z0-9.,\- ]+$') { Fail "HybridHopDomains may only contain letters, digits, dots, dashes and commas." }
