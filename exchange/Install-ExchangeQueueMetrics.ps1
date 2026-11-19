@@ -212,6 +212,22 @@ $taskRoot = $scheduler.GetFolder("\")
 
 function Register-MetricsTask {
     param([string]$Name, [string]$Arguments, [int]$RepeatMinutes = 0)
+    if ($PSCmdlet.ParameterSetName -eq "gMSA") {
+        # The COM RegisterTaskDefinition call rejects a gMSA ("(50,4):Task:"); the ScheduledTask cmdlets
+        # accept it with logon type Password and no password.
+        try {
+            $act = New-ScheduledTaskAction -Execute $ps -Argument $Arguments -WorkingDirectory $InstallPath
+            $set = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable `
+                -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+            $prn = New-ScheduledTaskPrincipal -UserId $runAs -LogonType Password -RunLevel Highest
+            $trg = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
+                -RepetitionInterval (New-TimeSpan -Minutes $RepeatMinutes) -RepetitionDuration (New-TimeSpan -Days 3650)
+            Register-ScheduledTask -TaskName $Name -Action $act -Trigger $trg -Principal $prn -Settings $set `
+                -Description "Sends Exchange queue metrics to the local Dynatrace OneAgent (MINT)." -Force | Out-Null
+        }
+        catch { Fail "Could not register task '$Name' as ${runAs}: $($_.Exception.Message)" }
+        return
+    }
     $def = $scheduler.NewTask(0)
     $def.RegistrationInfo.Description = "Sends Exchange queue metrics to the local Dynatrace OneAgent (MINT)."
     $def.Principal.RunLevel = 1                      # TASK_RUNLEVEL_HIGHEST
