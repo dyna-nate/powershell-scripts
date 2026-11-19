@@ -181,7 +181,7 @@ Ok "test metric accepted (HTTP $($resp.StatusCode))"
 if ($PSCmdlet.ParameterSetName -eq "gMSA") {
     $runAs = $ServiceAccount
     $plain = $null
-    $logonType = 5          # TASK_LOGON_SERVICE_ACCOUNT: password managed by Active Directory
+    $logonType = 1          # TASK_LOGON_PASSWORD with no password: Task Scheduler gets a gMSA password from AD (type 5 is rejected)
     if (Get-Command Test-ADServiceAccount -ErrorAction SilentlyContinue) {
         $gmsaName = ($ServiceAccount -split '\\')[1].TrimEnd('$')
         if (-not (Test-ADServiceAccount -Identity $gmsaName -ErrorAction SilentlyContinue)) {
@@ -235,7 +235,7 @@ function Register-MetricsTask {
         $trigger.Enabled = $true
     }
     try {
-        # 6 = TASK_CREATE_OR_UPDATE; $logonType 1 = password, 5 = service account (gMSA, no password)
+        # 6 = TASK_CREATE_OR_UPDATE; 1 = TASK_LOGON_PASSWORD (a gMSA passes a null password)
         [void]$taskRoot.RegisterTaskDefinition($Name, $def, 6, $runAs, $plain, $logonType, $null)
     }
     catch { Fail "Could not register task '$Name' as ${runAs}: $($_.Exception.Message)" }
